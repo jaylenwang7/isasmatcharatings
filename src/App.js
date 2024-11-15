@@ -71,47 +71,53 @@ const TierList = ({ places, onPlaceSelect }) => {
   const [expandedTier, setExpandedTier] = useState(null);
   
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {Object.keys(TIERS).map(tier => (
-        <div key={tier} className="relative">
-          {/* Tier description tooltip/expansion */}
+        <div key={tier} className="relative transform transition-all duration-200 hover:scale-[1.02]">
           <div 
             className={`absolute -top-2 left-0 right-0 transform -translate-y-full 
-              bg-white p-4 rounded-lg shadow-lg z-10 transition-opacity duration-200
-              ${expandedTier === tier ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+              bg-white/95 backdrop-blur-sm p-4 rounded-lg shadow-lg z-10 transition-all duration-300
+              ${expandedTier === tier ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2 pointer-events-none'}`}
           >
-            {TIERS[tier].description}
+            <p className="text-gray-700 leading-relaxed">{TIERS[tier].description}</p>
           </div>
           
           <div 
-            className={`rounded-lg p-4 shadow border ${TIERS[tier].borderColor} cursor-pointer`}
+            className={`rounded-xl p-5 shadow-md hover:shadow-xl transition-shadow duration-300 
+              border-l-4 ${TIERS[tier].borderColor} bg-gradient-to-br from-white to-gray-50`}
             onClick={() => setExpandedTier(expandedTier === tier ? null : tier)}
             onMouseLeave={() => setExpandedTier(null)}
           >
-            <div className="flex items-center gap-4">
-              <div className={`w-12 h-12 flex items-center justify-center text-2xl font-bold ${TIERS[tier].color} rounded ${TIERS[tier].textColor}`}>
+            <div className="flex items-center gap-6">
+              <div className={`w-16 h-16 flex items-center justify-center text-3xl font-bold 
+                bg-gradient-to-br ${TIERS[tier].gradientFrom} ${TIERS[tier].gradientTo} 
+                rounded-lg shadow-inner text-white transform transition-transform duration-200 
+                hover:scale-110`}>
                 {tier}
               </div>
-              <div className="flex flex-wrap gap-2 flex-1">
+              <div className="flex flex-wrap gap-3 flex-1">
                 {places.filter(place => place.tier === tier).map(place => (
                   <div 
                     key={place.id}
-                    className={`relative group p-2 rounded cursor-pointer ${TIERS[tier].color}`}
+                    className={`relative group p-3 rounded-lg cursor-pointer 
+                      ${TIERS[tier].color} transform transition-all duration-200 
+                      hover:scale-105 hover:shadow-md`}
                     onClick={(e) => {
                       e.stopPropagation();
                       onPlaceSelect(place);
                     }}
                   >
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-3">
                       {place.imagePath && (
                         <div 
-                          className="w-8 h-8 rounded overflow-hidden bg-center bg-cover opacity-50"
+                          className="w-10 h-10 rounded-full overflow-hidden bg-center bg-cover 
+                            shadow-inner transition-opacity duration-200 opacity-75 group-hover:opacity-100"
                           style={{
                             backgroundImage: `url(${getBasePath()}/${place.imagePath})`
                           }}
                         />
                       )}
-                      <span>{place.name}</span>
+                      <span className="font-medium">{place.name}</span>
                     </div>
                   </div>
                 ))}
@@ -132,42 +138,60 @@ const PlaceDetails = ({ place, onClose }) => {
   const tierStyle = TIERS[place.tier];
   
   return (
-    <div className="bg-white rounded-lg p-6 shadow-lg relative">
+    <div className="bg-white rounded-xl p-6 shadow-lg relative transform transition-all duration-300 hover:shadow-xl">
       <button
         onClick={onClose}
-        className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 text-xl font-bold p-2 z-10"
+        className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 
+          bg-white/80 hover:bg-white rounded-full w-8 h-8 flex items-center justify-center
+          transition-all duration-200 hover:scale-110"
         aria-label="Close details"
       >
         ×
       </button>
       
       <div className="relative">
-        <img 
-          src={`${getBasePath()}/${place.imagePath}`} 
-          alt={place.name}
-          className={`w-full rounded-lg mb-4 cursor-pointer transition-all duration-300 ${
-            isImageExpanded 
-              ? 'h-auto object-contain' 
-              : 'h-48 object-cover'
-          }`}
-          onClick={() => setIsImageExpanded(!isImageExpanded)}
-        />
-        <button
-          onClick={() => setIsImageExpanded(!isImageExpanded)}
-          className="absolute bottom-6 right-2 bg-white/90 hover:bg-white px-2 py-1 rounded-full text-sm text-gray-700 shadow"
-        >
-          {isImageExpanded ? 'Show less' : 'Show more'}
-        </button>
+        <div className="relative overflow-hidden rounded-xl">
+          <img 
+            src={`${getBasePath()}/${place.imagePath}`} 
+            alt={place.name}
+            className={`w-full transition-all duration-500 ease-in-out ${
+              isImageExpanded 
+                ? 'h-auto max-h-[600px] object-contain' 
+                : 'h-56 object-cover'
+            }`}
+            onClick={() => setIsImageExpanded(!isImageExpanded)}
+          />
+          <button
+            onClick={() => setIsImageExpanded(!isImageExpanded)}
+            className="absolute bottom-4 right-4 bg-white/90 hover:bg-white px-4 py-2 
+              rounded-full text-sm text-gray-700 shadow-md hover:shadow-lg 
+              transition-all duration-200 backdrop-blur-sm"
+          >
+            {isImageExpanded ? 'Show less' : 'Show more'}
+          </button>
+        </div>
       </div>
       
-      <h2 className="text-2xl font-bold mb-2">{place.name}</h2>
-      <div className={`inline-block px-3 py-1 rounded-full mb-4 ${tierStyle.color} ${tierStyle.textColor} font-medium`}>
-        Tier {place.tier}
+      <div className="mt-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-bold">{place.name}</h2>
+          <div className={`px-4 py-2 rounded-full ${tierStyle.color} ${tierStyle.textColor} 
+            font-medium transform transition-transform duration-200 hover:scale-105`}>
+            Tier {place.tier}
+          </div>
+        </div>
+        
+        <div className="space-y-3">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-800">Ordered</h3>
+            <p className="text-gray-700 leading-relaxed mt-1">{place.ordered}</p>
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-gray-800">Notes</h3>
+            <p className="text-gray-700 leading-relaxed mt-1">{place.notes}</p>
+          </div>
+        </div>
       </div>
-      <h3 className="font-semibold mb-2">Ordered:</h3>
-      <p className="text-gray-700 mb-4">{place.ordered}</p>
-      <h3 className="font-semibold mb-2">Notes:</h3>
-      <p className="text-gray-700">{place.notes}</p>
     </div>
   );
 };
@@ -218,27 +242,36 @@ const App = () => {
   }
 
   return (
-    <div className="min-h-screen bg-green-50">
-      <header className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <h1 className="text-3xl font-bold text-gray-900">Isa's Matcha Tier List 🍵</h1>
-          <p className="mt-2 text-gray-600">
-            This is Isa's definitive matcha tier list! Isa has visited all these places and rated them based on their matcha quality and overall experience.
+    <div className="min-h-screen bg-gradient-to-br from-green-50 to-gray-50">
+      <header className="bg-white/80 backdrop-blur-sm shadow-sm sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-6 py-8">
+          <h1 className="text-4xl font-bold text-gray-900 flex items-center gap-3">
+            Isa's Matcha Tier List 
+            <span className="text-3xl transform hover:scale-125 transition-transform duration-300 cursor-default">
+              🍵
+            </span>
+          </h1>
+          <p className="mt-3 text-gray-600 leading-relaxed max-w-2xl">
+            This is Isa's definitive matcha tier list! Isa has visited all these places and 
+            rated them based on their matcha quality and overall experience.
           </p>
         </div>
       </header>
       
-      <main className="max-w-7xl mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <main className="max-w-7xl mx-auto px-6 py-10">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
           <div>
-            <h2 className="text-2xl font-bold mb-6">Tier List ({places.length} places)</h2>
+            <h2 className="text-2xl font-bold mb-8 flex items-center gap-2">
+              Tier List 
+              <span className="text-gray-500 font-normal">({places.length} places)</span>
+            </h2>
             <TierList 
               places={places} 
               onPlaceSelect={setSelectedPlace}
             />
           </div>
           
-          <div className="space-y-8">
+          <div className="space-y-10">
             {selectedPlace && (
               <PlaceDetails 
                 place={selectedPlace} 
@@ -246,7 +279,7 @@ const App = () => {
               />
             )}
             
-            <div className="h-[400px] rounded-lg overflow-hidden">
+            <div className="h-[500px] rounded-xl overflow-hidden shadow-lg">
               <MapContainer 
                 center={[40.443394552756146, -79.94169118980099]} 
                 zoom={13} 
@@ -261,7 +294,10 @@ const App = () => {
                       click: () => setSelectedPlace(place),
                     }}
                   >
-                    <Popup>{place.name}</Popup>
+                    <Popup>
+                      <div className="font-medium">{place.name}</div>
+                      <div className="text-sm text-gray-600">Tier {place.tier}</div>
+                    </Popup>
                   </Marker>
                 ))}
               </MapContainer>
