@@ -16,3 +16,12 @@
 .animate-slide-in {
   animation: slideIn 0.5s ease-out;
 }
+
+@keyframes sparkle {
+  0%, 100% { opacity: 0; transform: scale(0); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
+.animate-sparkle {
+  animation: sparkle 2s ease-in-out infinite;
+}

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { Camera, X } from 'lucide-react';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
@@ -23,7 +24,7 @@ const TIERS = {
     borderColor: 'border-purple-300',
     gradientFrom: 'from-purple-500',
     gradientTo: 'to-purple-300',
-    description: 'Exceptional matcha spots that I absolutely love and highly recommend!'
+    description: 'This matcha is good af - the best of the best, would go out of my way for it'
   },
   A: {
     color: 'bg-green-100 hover:bg-green-200',
@@ -31,7 +32,7 @@ const TIERS = {
     borderColor: 'border-green-300',
     gradientFrom: 'from-green-500',
     gradientTo: 'to-green-300',
-    description: 'Great places with consistently high-quality matcha'
+    description: 'Would be happy to have this matcha any day of the week'
   },
   B: {
     color: 'bg-blue-100 hover:bg-blue-200',
@@ -39,7 +40,7 @@ const TIERS = {
     borderColor: 'border-blue-300',
     gradientFrom: 'from-blue-500',
     gradientTo: 'to-blue-300',
-    description: 'Solid choices for your matcha fix'
+    description: 'Solid choice, would be happy to get this at a cafe'
   },
   C: {
     color: 'bg-yellow-100 hover:bg-yellow-200',
@@ -47,7 +48,7 @@ const TIERS = {
     borderColor: 'border-yellow-300',
     gradientFrom: 'from-yellow-500',
     gradientTo: 'to-yellow-300',
-    description: 'Decent matcha, but nothing special'
+    description: 'Decent matcha when you need to order something at a cafe'
   },
   D: {
     color: 'bg-orange-100 hover:bg-orange-200',
@@ -55,7 +56,7 @@ const TIERS = {
     borderColor: 'border-orange-300',
     gradientFrom: 'from-orange-500',
     gradientTo: 'to-orange-300',
-    description: 'Below average - would not recommend'
+    description: 'Bruh, lackluster, would not recommend'
   },
   F: {
     color: 'bg-red-100 hover:bg-red-200',
@@ -63,9 +64,64 @@ const TIERS = {
     borderColor: 'border-red-300',
     gradientFrom: 'from-red-500',
     gradientTo: 'to-red-300',
-    description: 'Disappointing experiences - avoid these places'
+    description: 'Would avoid and maybe not even finish'
   }
 };
+
+const PhotoGrid = ({ places, onPlaceSelect, isOpen, onClose }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[1001] overflow-y-auto">
+      <div className="max-w-7xl mx-auto px-6 py-20">
+        <div className="flex justify-between items-center mb-8">
+          <h2 className="text-3xl font-bold text-white">Photo Gallery</h2>
+          <button
+            onClick={onClose}
+            className="text-white hover:text-gray-200 transition-colors"
+          >
+            <X size={24} />
+          </button>
+        </div>
+        
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          {places.map((place) => (
+            <div
+              key={place.id}
+              className="group relative bg-white rounded-xl overflow-hidden shadow-lg 
+                transform transition-all duration-300 hover:scale-105 cursor-pointer"
+              onClick={() => {
+                onPlaceSelect(place);
+                onClose();
+              }}
+            >
+              <div className="aspect-square">
+                <img
+                  src={`${getBasePath()}/${place.imagePath}`}
+                  alt={place.name}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent 
+                opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                <div className="absolute bottom-0 left-0 right-0 p-4 text-white">
+                  <h3 className="font-semibold text-lg">{place.name}</h3>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className={`px-2 py-1 rounded-full text-sm 
+                      ${TIERS[place.tier].color} ${TIERS[place.tier].textColor}`}>
+                      Tier {place.tier}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 
 const TierList = ({ places, onPlaceSelect }) => {
   const [expandedTier, setExpandedTier] = useState(null);
@@ -206,6 +262,7 @@ const App = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isDetailsVisible, setIsDetailsVisible] = useState(false);
+  const [isPhotoGridOpen, setIsPhotoGridOpen] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -252,7 +309,7 @@ const App = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-green-50 flex items-center justify-center">
-        <div className="text-xl font-semibold">Loading places...</div>
+        <div className="text-xl font-semibold animate-pulse">Loading places...</div>
       </div>
     );
   }
@@ -271,16 +328,28 @@ const App = () => {
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-gray-50">
       <header className="bg-white/80 backdrop-blur-sm shadow-sm sticky top-0 z-[1000]">
         <div className="max-w-7xl mx-auto px-6 py-8">
-          <h1 className="text-4xl font-bold text-gray-900 flex items-center gap-3">
-            Isa's Matcha Tier List 
-            <span className="text-3xl transform hover:scale-125 transition-transform duration-300 cursor-default">
-              🍵
-            </span>
-          </h1>
-          <p className="mt-3 text-gray-600 leading-relaxed max-w-2xl">
-            This is Isa's definitive matcha tier list! Isa has visited all these places and 
-            rated them based on their matcha quality and overall experience.
-          </p>
+          <div className="flex justify-between items-start">
+            <div>
+              <h1 className="text-4xl font-bold text-gray-900 flex items-center gap-3">
+                Isa's Matcha Tier List 
+                <span className="text-3xl transform hover:scale-125 transition-transform duration-300 cursor-default">
+                  🍵
+                </span>
+              </h1>
+              <p className="mt-3 text-gray-600 leading-relaxed max-w-2xl">
+                This is Isa's definitive matcha tier list! Isa has visited all these places and 
+                rated them based on their matcha quality and overall experience.
+              </p>
+            </div>
+            <button
+              onClick={() => setIsPhotoGridOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-green-100 hover:bg-green-200 
+                text-green-800 rounded-lg transition-colors duration-200 shadow-sm hover:shadow-md"
+            >
+              <Camera size={20} />
+              <span>View Gallery</span>
+            </button>
+          </div>
         </div>
       </header>
       
@@ -298,8 +367,11 @@ const App = () => {
           </div>
           
           <div className="space-y-10">
-            <div className="relative z-[900] transition-opacity duration-300 ease-in-out"
-                 style={{ opacity: isDetailsVisible ? 1 : 0 }}>
+            <div className="relative z-[900] transition-all duration-300 ease-in-out"
+                 style={{ 
+                   opacity: isDetailsVisible ? 1 : 0,
+                   transform: isDetailsVisible ? 'translateY(0)' : 'translateY(-20px)'
+                 }}>
               {selectedPlace && (
                 <PlaceDetails 
                   place={selectedPlace} 
@@ -308,7 +380,8 @@ const App = () => {
               )}
             </div>
             
-            <div className="h-[500px] rounded-xl overflow-hidden shadow-lg relative z-[800]">
+            <div className="h-[500px] rounded-xl overflow-hidden shadow-lg relative z-[800]
+                          transform transition-all duration-500 hover:shadow-2xl">
               <MapContainer 
                 center={[40.443394552756146, -79.94169118980099]} 
                 zoom={13} 
@@ -335,6 +408,13 @@ const App = () => {
           </div>
         </div>
       </main>
+
+      <PhotoGrid
+        places={places}
+        onPlaceSelect={handlePlaceSelect}
+        isOpen={isPhotoGridOpen}
+        onClose={() => setIsPhotoGridOpen(false)}
+      />
     </div>
   );
 };
