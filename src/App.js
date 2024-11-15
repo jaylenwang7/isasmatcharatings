@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
-import { X } from 'lucide-react';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
@@ -106,9 +105,10 @@ const TierList = ({ places, onPlaceSelect, onPlaceRemove }) => {
                           e.stopPropagation();
                           onPlaceRemove(place.id);
                         }}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="opacity-0 group-hover:opacity-100 transition-opacity px-1"
+                        aria-label="Remove place"
                       >
-                        <X className="w-4 h-4" />
+                        ×
                       </button>
                     </div>
                   </div>
@@ -145,110 +145,109 @@ const PlaceDetails = ({ place }) => {
 };
 
 const App = () => {
-    const [places, setPlaces] = useState([]);
-    const [selectedPlace, setSelectedPlace] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
-    
-    useEffect(() => {
-      setLoading(true);
-      fetch(`${getBasePath()}/data/places.json`)
-        .then(response => {
-          if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-          return response.json();
-        })
-        .then(data => {
-          if (!Array.isArray(data)) throw new Error('Data is not in the expected format');
-          setPlaces(data);
-          setError(null);
-        })
-        .catch(error => {
-          console.error('Error loading places:', error);
-          setError(`Failed to load places data: ${error.message}`);
-        })
-        .finally(() => {
-          setLoading(false);
-        });
-    }, []);
+  const [places, setPlaces] = useState([]);
+  const [selectedPlace, setSelectedPlace] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   
-    const handlePlaceRemove = (placeId) => {
-      setPlaces(places.filter(place => place.id !== placeId));
-      if (selectedPlace?.id === placeId) {
-        setSelectedPlace(null);
-      }
-    };
-  
-    if (loading) {
-      return (
-        <div className="min-h-screen bg-green-50 flex items-center justify-center">
-          <div className="text-xl font-semibold">Loading places...</div>
-        </div>
-      );
+  useEffect(() => {
+    setLoading(true);
+    fetch(`${getBasePath()}/data/places.json`)
+      .then(response => {
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        return response.json();
+      })
+      .then(data => {
+        if (!Array.isArray(data)) throw new Error('Data is not in the expected format');
+        setPlaces(data);
+        setError(null);
+      })
+      .catch(error => {
+        console.error('Error loading places:', error);
+        setError(`Failed to load places data: ${error.message}`);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, []);
+
+  const handlePlaceRemove = (placeId) => {
+    setPlaces(places.filter(place => place.id !== placeId));
+    if (selectedPlace?.id === placeId) {
+      setSelectedPlace(null);
     }
-  
-    if (error) {
-      return (
-        <div className="min-h-screen bg-green-50 flex items-center justify-center">
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-            {error}
-          </div>
-        </div>
-      );
-    }
-  
+  };
+
+  if (loading) {
     return (
-      <div className="min-h-screen bg-green-50">
-        <header className="bg-white shadow-sm">
-          <div className="max-w-7xl mx-auto px-4 py-6">
-            <h1 className="text-3xl font-bold text-gray-900">Isa's Matcha Tier List 🍵</h1>
-            <p className="mt-2 text-gray-600">
-              Welcome to my curated list of matcha spots! I've visited each of these places 
-              and ranked them based on quality, taste, ambiance, and overall experience. 
-              From exceptional ceremonial grade matcha to disappointing duds, here's my complete 
-              guide to finding the best matcha in the city.
-            </p>
-          </div>
-        </header>
-        
-        <main className="max-w-7xl mx-auto px-4 py-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div>
-              <h2 className="text-2xl font-bold mb-6">Tier List ({places.length} places)</h2>
-              <TierList 
-                places={places} 
-                onPlaceSelect={setSelectedPlace}
-                onPlaceRemove={handlePlaceRemove}
-              />
-            </div>
-            
-            <div className="space-y-8">
-              {selectedPlace && <PlaceDetails place={selectedPlace} />}
-              
-              <div className="h-[400px] rounded-lg overflow-hidden">
-                <MapContainer 
-                  center={[37.7749, -122.4194]} 
-                  zoom={13} 
-                  style={{ height: '100%', width: '100%' }}
-                >
-                  <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                  {places.map(place => (
-                    <Marker 
-                      key={place.id}
-                      position={[place.lat, place.lng]}
-                      eventHandlers={{
-                        click: () => setSelectedPlace(place),
-                      }}
-                    >
-                      <Popup>{place.name}</Popup>
-                    </Marker>
-                  ))}
-                </MapContainer>
-              </div>
-            </div>
-          </div>
-        </main>
+      <div className="min-h-screen bg-green-50 flex items-center justify-center">
+        <div className="text-xl font-semibold">Loading places...</div>
       </div>
     );
-  };
-  
-  export default App;
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-green-50 flex items-center justify-center">
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+          {error}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-green-50">
+      <header className="bg-white shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 py-6">
+          <h1 className="text-3xl font-bold text-gray-900">Isa's Matcha Tier List 🍵</h1>
+          <p className="mt-2 text-gray-600">
+            My personal matcha journey through the city! Each place is rated based on 
+            the quality of matcha, ambiance, and overall experience. These ratings help me 
+            remember my favorites and track new places to try.
+          </p>
+        </div>
+      </header>
+      
+      <main className="max-w-7xl mx-auto px-4 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div>
+            <h2 className="text-2xl font-bold mb-6">Tier List ({places.length} places)</h2>
+            <TierList 
+              places={places} 
+              onPlaceSelect={setSelectedPlace}
+              onPlaceRemove={handlePlaceRemove}
+            />
+          </div>
+          
+          <div className="space-y-8">
+            {selectedPlace && <PlaceDetails place={selectedPlace} />}
+            
+            <div className="h-[400px] rounded-lg overflow-hidden">
+              <MapContainer 
+                center={[37.7749, -122.4194]} 
+                zoom={13} 
+                style={{ height: '100%', width: '100%' }}
+              >
+                <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                {places.map(place => (
+                  <Marker 
+                    key={place.id}
+                    position={[place.lat, place.lng]}
+                    eventHandlers={{
+                      click: () => setSelectedPlace(place),
+                    }}
+                  >
+                    <Popup>{place.name}</Popup>
+                  </Marker>
+                ))}
+              </MapContainer>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+};
+
+export default App;
