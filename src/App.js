@@ -64,63 +64,101 @@ const PlaceDetails = ({ place }) => {
 };
 
 const App = () => {
-  const [places, setPlaces] = useState([]);
-  const [selectedPlace, setSelectedPlace] = useState(null);
+    const [places, setPlaces] = useState([]);
+    const [selectedPlace, setSelectedPlace] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    
+    // Load places data
+    useEffect(() => {
+      setLoading(true);
+      fetch('/data/places.json')
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          return response.json();
+        })
+        .then(data => {
+          if (!Array.isArray(data)) {
+            throw new Error('Data is not in the expected format');
+          }
+          setPlaces(data);
+          setError(null);
+        })
+        .catch(error => {
+          console.error('Error loading places:', error);
+          setError(`Failed to load places data: ${error.message}`);
+        })
+        .finally(() => {
+          setLoading(false);
+        });
+    }, []);
   
-  // Load places data
-  React.useEffect(() => {
-    fetch('/data/places.json')
-      .then(response => response.json())
-      .then(data => setPlaces(data))
-      .catch(error => console.error('Error loading places:', error));
-  }, []);
-
-  return (
-    <div className="min-h-screen bg-green-50">
-      <header className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <h1 className="text-3xl font-bold text-gray-900">Matcha Adventures 🍵</h1>
+    if (loading) {
+      return (
+        <div className="min-h-screen bg-green-50 flex items-center justify-center">
+          <div className="text-xl font-semibold">Loading places...</div>
         </div>
-      </header>
-      
-      <main className="max-w-7xl mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <div>
-            <h2 className="text-2xl font-bold mb-6">Tier List</h2>
-            <TierList 
-              places={places} 
-              onPlaceSelect={setSelectedPlace} 
-            />
+      );
+    }
+  
+    if (error) {
+      return (
+        <div className="min-h-screen bg-green-50 flex items-center justify-center">
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+            {error}
           </div>
-          
-          <div className="space-y-8">
-            {selectedPlace && <PlaceDetails place={selectedPlace} />}
+        </div>
+      );
+    }
+  
+    return (
+      <div className="min-h-screen bg-green-50">
+        <header className="bg-white shadow-sm">
+          <div className="max-w-7xl mx-auto px-4 py-6">
+            <h1 className="text-3xl font-bold text-gray-900">Matcha Adventures 🍵</h1>
+          </div>
+        </header>
+        
+        <main className="max-w-7xl mx-auto px-4 py-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div>
+              <h2 className="text-2xl font-bold mb-6">Tier List ({places.length} places)</h2>
+              <TierList 
+                places={places} 
+                onPlaceSelect={setSelectedPlace} 
+              />
+            </div>
             
-            <div className="h-[400px] rounded-lg overflow-hidden">
-              <MapContainer 
-                center={[37.7749, -122.4194]} 
-                zoom={13} 
-                style={{ height: '100%', width: '100%' }}
-              >
-                <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                {places.map(place => (
-                  <Marker 
-                    key={place.id}
-                    position={[place.lat, place.lng]}
-                    eventHandlers={{
-                      click: () => setSelectedPlace(place),
-                    }}
-                  >
-                    <Popup>{place.name}</Popup>
-                  </Marker>
-                ))}
-              </MapContainer>
+            <div className="space-y-8">
+              {selectedPlace && <PlaceDetails place={selectedPlace} />}
+              
+              <div className="h-[400px] rounded-lg overflow-hidden">
+                <MapContainer 
+                  center={[37.7749, -122.4194]} 
+                  zoom={13} 
+                  style={{ height: '100%', width: '100%' }}
+                >
+                  <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                  {places.map(place => (
+                    <Marker 
+                      key={place.id}
+                      position={[place.lat, place.lng]}
+                      eventHandlers={{
+                        click: () => setSelectedPlace(place),
+                      }}
+                    >
+                      <Popup>{place.name}</Popup>
+                    </Marker>
+                  ))}
+                </MapContainer>
+              </div>
             </div>
           </div>
-        </div>
-      </main>
-    </div>
-  );
-};
-
-export default App;
+        </main>
+      </div>
+    );
+  };
+  
+  export default App;

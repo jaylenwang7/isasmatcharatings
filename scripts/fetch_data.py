@@ -142,6 +142,10 @@ def fetch_and_process_data():
     
     for idx, record in enumerate(records):
         try:
+            # Skip empty rows
+            if not record['Place Name'].strip():
+                continue
+
             # Parse coordinates
             lat, lng = parse_coordinates(record['Lat/Long from Google Maps'])
             
@@ -184,12 +188,18 @@ def fetch_and_process_data():
         for error in errors:
             print(f"- {error}")
     
-    # Save to JSON file
-    output_path = Path('src/data/places.json')
+    # Save to public folder instead of src
+    output_path = Path('public/data/places.json')
     output_path.parent.mkdir(parents=True, exist_ok=True)
     
-    with output_path.open('w', encoding='utf-8') as f:
-        json.dump(processed_places, f, indent=2, ensure_ascii=False)
+    # Add error handling for file writing
+    try:
+        with output_path.open('w', encoding='utf-8') as f:
+            json.dump(processed_places, f, indent=2, ensure_ascii=False)
+        print(f"\nSuccessfully saved data to {output_path}")
+    except Exception as e:
+        print(f"Error saving JSON file: {e}")
+        raise
     
     print(f"\nProcessed {len(processed_places)} places successfully")
     print(f"Downloaded {len(processed_images)} images")
