@@ -113,9 +113,10 @@ const TierList = ({ places, onPlaceSelect }) => {
 };
 
 const PlaceDetails = ({ place, onClose }) => {
+  const [isImageExpanded, setIsImageExpanded] = useState(false);
+  
   if (!place) return null;
   
-  const [isImageExpanded, setIsImageExpanded] = useState(false);
   const tierStyle = TIERS[place.tier];
   
   return (
