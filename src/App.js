@@ -21,36 +21,48 @@ const TIERS = {
     color: 'bg-purple-100 hover:bg-purple-200',
     textColor: 'text-purple-800',
     borderColor: 'border-purple-300',
+    gradientFrom: 'from-purple-500',
+    gradientTo: 'to-purple-300',
     description: 'Exceptional matcha spots that I absolutely love and highly recommend!'
   },
   A: {
     color: 'bg-green-100 hover:bg-green-200',
     textColor: 'text-green-800',
     borderColor: 'border-green-300',
+    gradientFrom: 'from-green-500',
+    gradientTo: 'to-green-300',
     description: 'Great places with consistently high-quality matcha'
   },
   B: {
     color: 'bg-blue-100 hover:bg-blue-200',
     textColor: 'text-blue-800',
     borderColor: 'border-blue-300',
+    gradientFrom: 'from-blue-500',
+    gradientTo: 'to-blue-300',
     description: 'Solid choices for your matcha fix'
   },
   C: {
     color: 'bg-yellow-100 hover:bg-yellow-200',
     textColor: 'text-yellow-800',
     borderColor: 'border-yellow-300',
+    gradientFrom: 'from-yellow-500',
+    gradientTo: 'to-yellow-300',
     description: 'Decent matcha, but nothing special'
   },
   D: {
     color: 'bg-orange-100 hover:bg-orange-200',
     textColor: 'text-orange-800',
     borderColor: 'border-orange-300',
+    gradientFrom: 'from-orange-500',
+    gradientTo: 'to-orange-300',
     description: 'Below average - would not recommend'
   },
   F: {
     color: 'bg-red-100 hover:bg-red-200',
     textColor: 'text-red-800',
     borderColor: 'border-red-300',
+    gradientFrom: 'from-red-500',
+    gradientTo: 'to-red-300',
     description: 'Disappointing experiences - avoid these places'
   }
 };
@@ -211,9 +223,7 @@ const App = () => {
         <div className="max-w-7xl mx-auto px-4 py-6">
           <h1 className="text-3xl font-bold text-gray-900">Isa's Matcha Tier List 🍵</h1>
           <p className="mt-2 text-gray-600">
-            My personal matcha journey through the city! Each place is rated based on 
-            the quality of matcha, ambiance, and overall experience. These ratings help me 
-            remember my favorites and track new places to try.
+            This is Isa's definitive matcha tier list! Isa has visited all these places and rated them based on their matcha quality and overall experience.
           </p>
         </div>
       </header>
@@ -238,7 +248,7 @@ const App = () => {
             
             <div className="h-[400px] rounded-lg overflow-hidden">
               <MapContainer 
-                center={[37.7749, -122.4194]} 
+                center={[40.443394552756146, -79.94169118980099]} 
                 zoom={13} 
                 style={{ height: '100%', width: '100%' }}
               >
