@@ -2,7 +2,7 @@
     "name": "matcha-reviews",
     "version": "0.1.0",
     "private": true,
-    "homepage": "https://[your-github-username].github.io/[repository-name]",
+    "homepage": "https://jaylenwang7.github.io/isasmatcharatings",
     "dependencies": {
       "react": "^18.2.0",
       "react-dom": "^18.2.0",
