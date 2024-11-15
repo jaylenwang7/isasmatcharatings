@@ -55,7 +55,7 @@ const TIERS = {
   }
 };
 
-const TierList = ({ places, onPlaceSelect, onPlaceRemove }) => {
+const TierList = ({ places, onPlaceSelect }) => {
   const [expandedTier, setExpandedTier] = useState(null);
   
   return (
@@ -100,16 +100,6 @@ const TierList = ({ places, onPlaceSelect, onPlaceRemove }) => {
                         />
                       )}
                       <span>{place.name}</span>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onPlaceRemove(place.id);
-                        }}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity px-1"
-                        aria-label="Remove place"
-                      >
-                        ×
-                      </button>
                     </div>
                   </div>
                 ))}
@@ -122,18 +112,43 @@ const TierList = ({ places, onPlaceSelect, onPlaceRemove }) => {
   );
 };
 
-const PlaceDetails = ({ place }) => {
+const PlaceDetails = ({ place, onClose }) => {
   if (!place) return null;
   
+  const [isImageExpanded, setIsImageExpanded] = useState(false);
+  const tierStyle = TIERS[place.tier];
+  
   return (
-    <div className="bg-white rounded-lg p-6 shadow-lg">
-      <img 
-        src={`${getBasePath()}/${place.imagePath}`} 
-        alt={place.name}
-        className="w-full h-48 object-cover rounded-lg mb-4"
-      />
+    <div className="bg-white rounded-lg p-6 shadow-lg relative">
+      <button
+        onClick={onClose}
+        className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 text-xl font-bold p-2 z-10"
+        aria-label="Close details"
+      >
+        ×
+      </button>
+      
+      <div className="relative">
+        <img 
+          src={`${getBasePath()}/${place.imagePath}`} 
+          alt={place.name}
+          className={`w-full rounded-lg mb-4 cursor-pointer transition-all duration-300 ${
+            isImageExpanded 
+              ? 'h-auto object-contain' 
+              : 'h-48 object-cover'
+          }`}
+          onClick={() => setIsImageExpanded(!isImageExpanded)}
+        />
+        <button
+          onClick={() => setIsImageExpanded(!isImageExpanded)}
+          className="absolute bottom-6 right-2 bg-white/90 hover:bg-white px-2 py-1 rounded-full text-sm text-gray-700 shadow"
+        >
+          {isImageExpanded ? 'Show less' : 'Show more'}
+        </button>
+      </div>
+      
       <h2 className="text-2xl font-bold mb-2">{place.name}</h2>
-      <div className="bg-green-100 inline-block px-3 py-1 rounded-full mb-4">
+      <div className={`inline-block px-3 py-1 rounded-full mb-4 ${tierStyle.color} ${tierStyle.textColor} font-medium`}>
         Tier {place.tier}
       </div>
       <h3 className="font-semibold mb-2">Ordered:</h3>
@@ -170,13 +185,6 @@ const App = () => {
         setLoading(false);
       });
   }, []);
-
-  const handlePlaceRemove = (placeId) => {
-    setPlaces(places.filter(place => place.id !== placeId));
-    if (selectedPlace?.id === placeId) {
-      setSelectedPlace(null);
-    }
-  };
 
   if (loading) {
     return (
@@ -216,12 +224,16 @@ const App = () => {
             <TierList 
               places={places} 
               onPlaceSelect={setSelectedPlace}
-              onPlaceRemove={handlePlaceRemove}
             />
           </div>
           
           <div className="space-y-8">
-            {selectedPlace && <PlaceDetails place={selectedPlace} />}
+            {selectedPlace && (
+              <PlaceDetails 
+                place={selectedPlace} 
+                onClose={() => setSelectedPlace(null)}
+              />
+            )}
             
             <div className="h-[400px] rounded-lg overflow-hidden">
               <MapContainer 
