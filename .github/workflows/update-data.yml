@@ -1,6 +1,8 @@
 # .github/workflows/update-data.yml
 name: Update Data and Deploy
 on:
+  push:
+    branches: [ main ]  # Triggers on push to main branch
   schedule:
     - cron: '0 0 * * *'  # Runs daily at midnight
   workflow_dispatch:      # Allows manual triggers
@@ -34,7 +36,7 @@ jobs:
 
       - name: Create credentials file
         run: |
-          echo "${{ secrets.GOOGLE_SHEETS_CREDENTIALS }}" > credentials.json
+          echo '${{ secrets.GOOGLE_SHEETS_CREDENTIALS }}' > credentials.json
         
       - name: Fetch and transform data
         run: python scripts/fetch_data.py
