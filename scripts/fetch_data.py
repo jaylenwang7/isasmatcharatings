@@ -13,16 +13,6 @@ from pathlib import Path
 import hashlib
 from datetime import datetime
 
-# Define expected columns and their purpose
-REQUIRED_COLUMNS = {
-    'name': 'Name of the matcha place',
-    'location': 'Coordinates copied from Google Maps',
-    'tier': 'Rating tier (S/A/B/C/D/F)',
-    'ordered': 'What was ordered',
-    'notes': 'Additional comments',
-    'image': 'URL or ID of the uploaded image'
-}
-
 def get_safe_filename(name: str, file_id: str) -> str:
     """
     Create a safe filename from the place name and file ID
@@ -153,10 +143,10 @@ def fetch_and_process_data():
     for idx, record in enumerate(records):
         try:
             # Parse coordinates
-            lat, lng = parse_coordinates(record['location'])
+            lat, lng = parse_coordinates(record['Lat/Long from Google Maps'])
             
             # Extract file ID from the image URL/ID
-            image_url = record['image']
+            image_url = record['Upload a picture!']
             file_id = image_url.split('=')[-1] if '=' in image_url else image_url
             
             # Download image if we haven't already
@@ -164,16 +154,16 @@ def fetch_and_process_data():
                 image_path = download_and_save_image(
                     drive_service, 
                     file_id,
-                    record['name']
+                    record['Place Name']
                 )
                 processed_images.add(file_id)
             
             processed_place = {
                 'id': idx,
-                'name': record['name'].strip(),
-                'tier': record['tier'].strip().upper(),
-                'ordered': record['ordered'].strip(),
-                'notes': record['notes'].strip(),
+                'name': record['Place Name'].strip(),
+                'tier': record['Tier Rating'].strip().upper(),
+                'ordered': record['What did you order?'].strip(),
+                'notes': record['Notes'].strip(),
                 'imagePath': image_path,
                 'lat': lat,
                 'lng': lng,
@@ -181,7 +171,7 @@ def fetch_and_process_data():
             }
             
             processed_places.append(processed_place)
-            print(f"Successfully processed {record['name']}")
+            print(f"Successfully processed {record['Place Name']}")
             
         except Exception as e:
             error_msg = f"Error in row {idx + 2}: {str(e)}"
