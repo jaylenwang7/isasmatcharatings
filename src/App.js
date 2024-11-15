@@ -141,9 +141,9 @@ const PlaceDetails = ({ place, onClose }) => {
     <div className="bg-white rounded-xl p-6 shadow-lg relative transform transition-all duration-300 hover:shadow-xl">
       <button
         onClick={onClose}
-        className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 
-          bg-white/80 hover:bg-white rounded-full w-8 h-8 flex items-center justify-center
-          transition-all duration-200 hover:scale-110"
+        className="absolute -top-2 -right-2 text-gray-500 hover:text-gray-700 
+          bg-white shadow-md hover:shadow-lg rounded-full w-8 h-8 flex items-center justify-center
+          transition-all duration-200 hover:scale-110 z-20"
         aria-label="Close details"
       >
         ×
@@ -260,7 +260,7 @@ const App = () => {
       
       <main className="max-w-7xl mx-auto px-6 py-10">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-          <div>
+          <div className="z-20"> {/* Increased z-index for tier list */}
             <h2 className="text-2xl font-bold mb-8 flex items-center gap-2">
               Tier List 
               <span className="text-gray-500 font-normal">({places.length} places)</span>
@@ -272,14 +272,16 @@ const App = () => {
           </div>
           
           <div className="space-y-10">
-            {selectedPlace && (
-              <PlaceDetails 
-                place={selectedPlace} 
-                onClose={() => setSelectedPlace(null)}
-              />
-            )}
+            <div className="relative z-20">
+              {selectedPlace && (
+                <PlaceDetails 
+                  place={selectedPlace} 
+                  onClose={() => setSelectedPlace(null)}
+                />
+              )}
+            </div>
             
-            <div className="h-[500px] rounded-xl overflow-hidden shadow-lg">
+            <div className="h-[500px] rounded-xl overflow-hidden shadow-lg z-10"> {/* Lowered z-index for map */}
               <MapContainer 
                 center={[40.443394552756146, -79.94169118980099]} 
                 zoom={13} 
