@@ -1,0 +1,213 @@
+import re
+import pandas as pd
+from typing import Tuple, Dict
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseDownload
+import io
+import os
+import json
+from pathlib import Path
+import hashlib
+from datetime import datetime
+
+# Define expected columns and their purpose
+REQUIRED_COLUMNS = {
+    'name': 'Name of the matcha place',
+    'location': 'Coordinates copied from Google Maps',
+    'tier': 'Rating tier (S/A/B/C/D/F)',
+    'ordered': 'What was ordered',
+    'notes': 'Additional comments',
+    'image': 'URL or ID of the uploaded image'
+}
+
+def get_safe_filename(name: str, file_id: str) -> str:
+    """
+    Create a safe filename from the place name and file ID
+    """
+    # Clean the name to be filesystem-safe
+    safe_name = re.sub(r'[^a-zA-Z0-9]', '-', name.lower())
+    # Add timestamp and partial hash for uniqueness
+    timestamp = datetime.now().strftime('%Y%m%d')
+    file_hash = hashlib.md5(file_id.encode()).hexdigest()[:6]
+    return f"{safe_name}-{timestamp}-{file_hash}.jpg"
+
+def download_and_save_image(service, file_id: str, place_name: str) -> str:
+    """
+    Download image from Google Drive and save it to the repository
+    Returns the path where the image was saved
+    """
+    try:
+        # Create images directory if it doesn't exist
+        images_dir = Path('public/images')
+        images_dir.mkdir(parents=True, exist_ok=True)
+
+        # Generate safe filename
+        filename = get_safe_filename(place_name, file_id)
+        file_path = images_dir / filename
+
+        # Download file
+        request = service.files().get_media(fileId=file_id)
+        fh = io.BytesIO()
+        downloader = MediaIoBaseDownload(fh, request)
+        
+        done = False
+        while not done:
+            status, done = downloader.next_chunk()
+            if status:
+                print(f"Downloading {filename}: {int(status.progress() * 100)}%")
+
+        # Save file
+        fh.seek(0)
+        with open(file_path, 'wb') as f:
+            f.write(fh.read())
+
+        return f"images/{filename}"
+
+    except Exception as e:
+        raise Exception(f"Error downloading image: {str(e)}")
+
+def parse_coordinates(coord_string: str) -> Tuple[float, float]:
+    """
+    Parse coordinates from various Google Maps formats.
+    Returns tuple of (latitude, longitude)
+    """
+    if not isinstance(coord_string, str):
+        raise ValueError(f"Coordinates must be a string, got: {type(coord_string)}")
+    
+    # Remove any extra whitespace
+    coord_string = coord_string.strip()
+    
+    # Case 1: Simple decimal numbers (37.7749, -122.4194)
+    if ',' in coord_string:
+        try:
+            lat, lng = map(float, coord_string.split(','))
+            return lat, lng
+        except ValueError:
+            pass
+
+    # Case 2: Decimal degrees with directions (37.7749° N, 122.4194° W)
+    decimal_pattern = r'(-?\d+\.?\d*)\s*°?\s*([NS])?[\s,]*(-?\d+\.?\d*)\s*°?\s*([WE])?'
+    match = re.search(decimal_pattern, coord_string)
+    if match:
+        lat, ns, lng, ew = match.groups()
+        lat = float(lat) * (-1 if ns == 'S' else 1)
+        lng = float(lng) * (-1 if ew == 'W' else 1)
+        return lat, lng
+
+    # Case 3: Degrees, minutes, seconds (37°46'29.7"N 122°25'09.9"W)
+    dms_pattern = r'''
+        (\d+)°                   # Degrees
+        (\d+)'                   # Minutes
+        (\d+\.?\d*)"?           # Seconds
+        \s*([NS])               # N/S
+        \s*
+        (\d+)°                   # Degrees
+        (\d+)'                   # Minutes
+        (\d+\.?\d*)"?           # Seconds
+        \s*([WE])               # W/E
+    '''
+    match = re.search(dms_pattern, coord_string, re.VERBOSE)
+    if match:
+        lat_d, lat_m, lat_s, ns, lng_d, lng_m, lng_s, ew = match.groups()
+        lat = float(lat_d) + float(lat_m)/60 + float(lat_s)/3600
+        lng = float(lng_d) + float(lng_m)/60 + float(lng_s)/3600
+        lat *= -1 if ns == 'S' else 1
+        lng *= -1 if ew == 'W' else 1
+        return lat, lng
+
+    raise ValueError("Could not parse coordinates")
+
+def fetch_and_process_data():
+    """
+    Fetch data from Google Sheets and process coordinates and images
+    """
+    # Set up Google Sheets and Drive authentication
+    scope = [
+        'https://spreadsheets.google.com/feeds',
+        'https://www.googleapis.com/auth/drive.readonly'
+    ]
+    
+    credentials = ServiceAccountCredentials.from_json_keyfile_name(
+        'credentials.json', scope)
+    
+    # Initialize Google Sheets client
+    sheets_client = gspread.authorize(credentials)
+    
+    # Initialize Google Drive service
+    drive_service = build('drive', 'v3', credentials=credentials)
+
+    # Open the spreadsheet
+    sheet = sheets_client.open_by_key(os.getenv('SHEET_ID')).sheet1
+    
+    # Get all records
+    records = sheet.get_all_records()
+    processed_places = []
+    errors = []
+    
+    # Track which images we've already downloaded
+    processed_images = set()
+    
+    for idx, record in enumerate(records):
+        try:
+            # Parse coordinates
+            lat, lng = parse_coordinates(record['location'])
+            
+            # Extract file ID from the image URL/ID
+            image_url = record['image']
+            file_id = image_url.split('=')[-1] if '=' in image_url else image_url
+            
+            # Download image if we haven't already
+            if file_id not in processed_images:
+                image_path = download_and_save_image(
+                    drive_service, 
+                    file_id,
+                    record['name']
+                )
+                processed_images.add(file_id)
+            
+            processed_place = {
+                'id': idx,
+                'name': record['name'].strip(),
+                'tier': record['tier'].strip().upper(),
+                'ordered': record['ordered'].strip(),
+                'notes': record['notes'].strip(),
+                'imagePath': image_path,
+                'lat': lat,
+                'lng': lng,
+                'lastUpdated': pd.Timestamp.now().isoformat()
+            }
+            
+            processed_places.append(processed_place)
+            print(f"Successfully processed {record['name']}")
+            
+        except Exception as e:
+            error_msg = f"Error in row {idx + 2}: {str(e)}"
+            errors.append(error_msg)
+            print(error_msg)
+            continue
+    
+    if errors:
+        print("\nProcessing completed with errors:")
+        for error in errors:
+            print(f"- {error}")
+    
+    # Save to JSON file
+    output_path = Path('src/data/places.json')
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    with output_path.open('w', encoding='utf-8') as f:
+        json.dump(processed_places, f, indent=2, ensure_ascii=False)
+    
+    print(f"\nProcessed {len(processed_places)} places successfully")
+    print(f"Downloaded {len(processed_images)} images")
+    print(f"Skipped {len(errors)} places due to errors")
+
+if __name__ == "__main__":
+    try:
+        fetch_and_process_data()
+    except Exception as e:
+        print(f"Fatal error: {e}")
+        raise
