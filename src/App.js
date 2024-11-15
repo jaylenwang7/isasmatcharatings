@@ -12,7 +12,7 @@ L.Icon.Default.mergeOptions({
   shadowUrl: require('leaflet/dist/images/marker-shadow.png'),
 });
 
-const TierList = ({ places }) => {
+const TierList = ({ places, onPlaceSelect }) => {
   const tiers = ['S', 'A', 'B', 'C', 'D', 'F'];
   
   return (
@@ -28,7 +28,7 @@ const TierList = ({ places }) => {
                 <div 
                   key={place.id}
                   className="p-2 bg-green-50 rounded cursor-pointer hover:bg-green-100"
-                  onClick={() => setSelectedPlace(place)}
+                  onClick={() => onPlaceSelect(place)}
                 >
                   {place.name}
                 </div>
@@ -42,15 +42,16 @@ const TierList = ({ places }) => {
 };
 
 const PlaceDetails = ({ place }) => {
+  if (!place) return null;
+  
   return (
     <div className="bg-white rounded-lg p-6 shadow-lg">
       <img 
-        src={`/images/${place.image}`} 
+        src={`/images/${place.imagePath}`} 
         alt={place.name}
         className="w-full h-48 object-cover rounded-lg mb-4"
       />
       <h2 className="text-2xl font-bold mb-2">{place.name}</h2>
-      <p className="text-gray-600 mb-2">{place.address}</p>
       <div className="bg-green-100 inline-block px-3 py-1 rounded-full mb-4">
         Tier {place.tier}
       </div>
@@ -66,6 +67,14 @@ const App = () => {
   const [places, setPlaces] = useState([]);
   const [selectedPlace, setSelectedPlace] = useState(null);
   
+  // Load places data
+  React.useEffect(() => {
+    fetch('/data/places.json')
+      .then(response => response.json())
+      .then(data => setPlaces(data))
+      .catch(error => console.error('Error loading places:', error));
+  }, []);
+
   return (
     <div className="min-h-screen bg-green-50">
       <header className="bg-white shadow-sm">
@@ -78,7 +87,10 @@ const App = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div>
             <h2 className="text-2xl font-bold mb-6">Tier List</h2>
-            <TierList places={places} setSelectedPlace={setSelectedPlace} />
+            <TierList 
+              places={places} 
+              onPlaceSelect={setSelectedPlace} 
+            />
           </div>
           
           <div className="space-y-8">
