@@ -243,7 +243,7 @@ const App = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-gray-50">
-      <header className="bg-white/80 backdrop-blur-sm shadow-sm sticky top-0 z-50">
+      <header className="bg-white/80 backdrop-blur-sm shadow-sm sticky top-0 z-[1000]">
         <div className="max-w-7xl mx-auto px-6 py-8">
           <h1 className="text-4xl font-bold text-gray-900 flex items-center gap-3">
             Isa's Matcha Tier List 
@@ -258,9 +258,9 @@ const App = () => {
         </div>
       </header>
       
-      <main className="max-w-7xl mx-auto px-6 py-10">
+      <main className="max-w-7xl mx-auto px-6 py-10 relative">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-          <div className="z-20"> {/* Increased z-index for tier list */}
+          <div className="z-[900]">
             <h2 className="text-2xl font-bold mb-8 flex items-center gap-2">
               Tier List 
               <span className="text-gray-500 font-normal">({places.length} places)</span>
@@ -272,7 +272,7 @@ const App = () => {
           </div>
           
           <div className="space-y-10">
-            <div className="relative z-20">
+            <div className="relative z-[900]">
               {selectedPlace && (
                 <PlaceDetails 
                   place={selectedPlace} 
@@ -281,7 +281,7 @@ const App = () => {
               )}
             </div>
             
-            <div className="h-[500px] rounded-xl overflow-hidden shadow-lg z-10"> {/* Lowered z-index for map */}
+            <div className="h-[500px] rounded-xl overflow-hidden shadow-lg relative z-[800]">
               <MapContainer 
                 center={[40.443394552756146, -79.94169118980099]} 
                 zoom={13} 
