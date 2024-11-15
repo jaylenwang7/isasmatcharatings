@@ -1,6 +1,6 @@
-// App.js
 import React, { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { X } from 'lucide-react';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
@@ -12,34 +12,108 @@ L.Icon.Default.mergeOptions({
   shadowUrl: require('leaflet/dist/images/marker-shadow.png'),
 });
 
-// Helper function to get the correct base path for GitHub Pages
 const getBasePath = () => {
-  // Get the repository name from package.json homepage or environment
-  const basePath = process.env.PUBLIC_URL || '';
-  return basePath;
+  return process.env.PUBLIC_URL || '';
 };
 
-const TierList = ({ places, onPlaceSelect }) => {
-  const tiers = ['S', 'A', 'B', 'C', 'D', 'F'];
+// Tier definitions with colors and descriptions
+const TIERS = {
+  S: {
+    color: 'bg-purple-100 hover:bg-purple-200',
+    textColor: 'text-purple-800',
+    borderColor: 'border-purple-300',
+    description: 'Exceptional matcha spots that I absolutely love and highly recommend!'
+  },
+  A: {
+    color: 'bg-green-100 hover:bg-green-200',
+    textColor: 'text-green-800',
+    borderColor: 'border-green-300',
+    description: 'Great places with consistently high-quality matcha'
+  },
+  B: {
+    color: 'bg-blue-100 hover:bg-blue-200',
+    textColor: 'text-blue-800',
+    borderColor: 'border-blue-300',
+    description: 'Solid choices for your matcha fix'
+  },
+  C: {
+    color: 'bg-yellow-100 hover:bg-yellow-200',
+    textColor: 'text-yellow-800',
+    borderColor: 'border-yellow-300',
+    description: 'Decent matcha, but nothing special'
+  },
+  D: {
+    color: 'bg-orange-100 hover:bg-orange-200',
+    textColor: 'text-orange-800',
+    borderColor: 'border-orange-300',
+    description: 'Below average - would not recommend'
+  },
+  F: {
+    color: 'bg-red-100 hover:bg-red-200',
+    textColor: 'text-red-800',
+    borderColor: 'border-red-300',
+    description: 'Disappointing experiences - avoid these places'
+  }
+};
+
+const TierList = ({ places, onPlaceSelect, onPlaceRemove }) => {
+  const [expandedTier, setExpandedTier] = useState(null);
   
   return (
     <div className="space-y-4">
-      {tiers.map(tier => (
-        <div key={tier} className="bg-white rounded-lg p-4 shadow">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 flex items-center justify-center text-2xl font-bold bg-green-100 rounded">
-              {tier}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {places.filter(place => place.tier === tier).map(place => (
-                <div 
-                  key={place.id}
-                  className="p-2 bg-green-50 rounded cursor-pointer hover:bg-green-100"
-                  onClick={() => onPlaceSelect(place)}
-                >
-                  {place.name}
-                </div>
-              ))}
+      {Object.keys(TIERS).map(tier => (
+        <div key={tier} className="relative">
+          {/* Tier description tooltip/expansion */}
+          <div 
+            className={`absolute -top-2 left-0 right-0 transform -translate-y-full 
+              bg-white p-4 rounded-lg shadow-lg z-10 transition-opacity duration-200
+              ${expandedTier === tier ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+          >
+            {TIERS[tier].description}
+          </div>
+          
+          <div 
+            className={`rounded-lg p-4 shadow border ${TIERS[tier].borderColor} cursor-pointer`}
+            onClick={() => setExpandedTier(expandedTier === tier ? null : tier)}
+            onMouseLeave={() => setExpandedTier(null)}
+          >
+            <div className="flex items-center gap-4">
+              <div className={`w-12 h-12 flex items-center justify-center text-2xl font-bold ${TIERS[tier].color} rounded ${TIERS[tier].textColor}`}>
+                {tier}
+              </div>
+              <div className="flex flex-wrap gap-2 flex-1">
+                {places.filter(place => place.tier === tier).map(place => (
+                  <div 
+                    key={place.id}
+                    className={`relative group p-2 rounded cursor-pointer ${TIERS[tier].color}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onPlaceSelect(place);
+                    }}
+                  >
+                    <div className="flex items-center gap-2">
+                      {place.imagePath && (
+                        <div 
+                          className="w-8 h-8 rounded overflow-hidden bg-center bg-cover opacity-50"
+                          style={{
+                            backgroundImage: `url(${getBasePath()}/${place.imagePath})`
+                          }}
+                        />
+                      )}
+                      <span>{place.name}</span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onPlaceRemove(place.id);
+                        }}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
@@ -76,20 +150,15 @@ const App = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     
-    // Load places data
     useEffect(() => {
       setLoading(true);
       fetch(`${getBasePath()}/data/places.json`)
         .then(response => {
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
+          if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
           return response.json();
         })
         .then(data => {
-          if (!Array.isArray(data)) {
-            throw new Error('Data is not in the expected format');
-          }
+          if (!Array.isArray(data)) throw new Error('Data is not in the expected format');
           setPlaces(data);
           setError(null);
         })
@@ -101,6 +170,13 @@ const App = () => {
           setLoading(false);
         });
     }, []);
+  
+    const handlePlaceRemove = (placeId) => {
+      setPlaces(places.filter(place => place.id !== placeId));
+      if (selectedPlace?.id === placeId) {
+        setSelectedPlace(null);
+      }
+    };
   
     if (loading) {
       return (
@@ -124,7 +200,13 @@ const App = () => {
       <div className="min-h-screen bg-green-50">
         <header className="bg-white shadow-sm">
           <div className="max-w-7xl mx-auto px-4 py-6">
-            <h1 className="text-3xl font-bold text-gray-900">Matcha Adventures 🍵</h1>
+            <h1 className="text-3xl font-bold text-gray-900">Isa's Matcha Tier List 🍵</h1>
+            <p className="mt-2 text-gray-600">
+              Welcome to my curated list of matcha spots! I've visited each of these places 
+              and ranked them based on quality, taste, ambiance, and overall experience. 
+              From exceptional ceremonial grade matcha to disappointing duds, here's my complete 
+              guide to finding the best matcha in the city.
+            </p>
           </div>
         </header>
         
@@ -134,7 +216,8 @@ const App = () => {
               <h2 className="text-2xl font-bold mb-6">Tier List ({places.length} places)</h2>
               <TierList 
                 places={places} 
-                onPlaceSelect={setSelectedPlace} 
+                onPlaceSelect={setSelectedPlace}
+                onPlaceRemove={handlePlaceRemove}
               />
             </div>
             
