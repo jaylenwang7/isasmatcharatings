@@ -54,7 +54,7 @@ const PlaceDetails = ({ place }) => {
   return (
     <div className="bg-white rounded-lg p-6 shadow-lg">
       <img 
-        src={`${getBasePath()}/images/${place.imagePath}`} 
+        src={`${getBasePath()}/${place.imagePath}`} 
         alt={place.name}
         className="w-full h-48 object-cover rounded-lg mb-4"
       />
