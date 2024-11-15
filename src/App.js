@@ -138,7 +138,10 @@ const PlaceDetails = ({ place, onClose }) => {
   const tierStyle = TIERS[place.tier];
   
   return (
-    <div className="bg-white rounded-xl p-6 shadow-lg relative transform transition-all duration-300 hover:shadow-xl">
+    <div 
+      className="bg-white rounded-xl p-6 shadow-lg relative transform transition-all duration-500 
+        ease-in-out origin-top hover:shadow-xl animate-slide-in"
+    >
       <button
         onClick={onClose}
         className="absolute -top-2 -right-2 text-gray-500 hover:text-gray-700 
@@ -199,9 +202,11 @@ const PlaceDetails = ({ place, onClose }) => {
 const App = () => {
   const [places, setPlaces] = useState([]);
   const [selectedPlace, setSelectedPlace] = useState(null);
+  const [mapRef, setMapRef] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
+  const [isDetailsVisible, setIsDetailsVisible] = useState(false);
+
   useEffect(() => {
     setLoading(true);
     fetch(`${getBasePath()}/data/places.json`)
@@ -222,6 +227,27 @@ const App = () => {
         setLoading(false);
       });
   }, []);
+
+  const handlePlaceSelect = (place) => {
+    setIsDetailsVisible(false);
+    setTimeout(() => {
+      setSelectedPlace(place);
+      setIsDetailsVisible(true);
+      if (mapRef) {
+        mapRef.flyTo([place.lat, place.lng], 15, {
+          duration: 1.5,
+          easeLinearity: 0.25
+        });
+      }
+    }, 300); // Wait for fade out before showing new place
+  };
+
+  const handleCloseDetails = () => {
+    setIsDetailsVisible(false);
+    setTimeout(() => {
+      setSelectedPlace(null);
+    }, 300); // Wait for fade out animation
+  };
 
   if (loading) {
     return (
@@ -258,7 +284,7 @@ const App = () => {
         </div>
       </header>
       
-      <main className="max-w-7xl mx-auto px-6 py-10 relative">
+      <main className="max-w-7xl mx-auto px-6 py-10">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
           <div className="z-[900]">
             <h2 className="text-2xl font-bold mb-8 flex items-center gap-2">
@@ -267,16 +293,17 @@ const App = () => {
             </h2>
             <TierList 
               places={places} 
-              onPlaceSelect={setSelectedPlace}
+              onPlaceSelect={handlePlaceSelect}
             />
           </div>
           
           <div className="space-y-10">
-            <div className="relative z-[900]">
+            <div className="relative z-[900] transition-opacity duration-300 ease-in-out"
+                 style={{ opacity: isDetailsVisible ? 1 : 0 }}>
               {selectedPlace && (
                 <PlaceDetails 
                   place={selectedPlace} 
-                  onClose={() => setSelectedPlace(null)}
+                  onClose={handleCloseDetails}
                 />
               )}
             </div>
@@ -286,6 +313,7 @@ const App = () => {
                 center={[40.443394552756146, -79.94169118980099]} 
                 zoom={13} 
                 style={{ height: '100%', width: '100%' }}
+                ref={setMapRef}
               >
                 <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                 {places.map(place => (
@@ -293,7 +321,7 @@ const App = () => {
                     key={place.id}
                     position={[place.lat, place.lng]}
                     eventHandlers={{
-                      click: () => setSelectedPlace(place),
+                      click: () => handlePlaceSelect(place),
                     }}
                   >
                     <Popup>
