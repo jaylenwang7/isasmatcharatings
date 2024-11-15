@@ -12,6 +12,13 @@ L.Icon.Default.mergeOptions({
   shadowUrl: require('leaflet/dist/images/marker-shadow.png'),
 });
 
+// Helper function to get the correct base path for GitHub Pages
+const getBasePath = () => {
+  // Get the repository name from package.json homepage or environment
+  const basePath = process.env.PUBLIC_URL || '';
+  return basePath;
+};
+
 const TierList = ({ places, onPlaceSelect }) => {
   const tiers = ['S', 'A', 'B', 'C', 'D', 'F'];
   
@@ -47,7 +54,7 @@ const PlaceDetails = ({ place }) => {
   return (
     <div className="bg-white rounded-lg p-6 shadow-lg">
       <img 
-        src={`/images/${place.imagePath}`} 
+        src={`${getBasePath()}/images/${place.imagePath}`} 
         alt={place.name}
         className="w-full h-48 object-cover rounded-lg mb-4"
       />
@@ -72,7 +79,7 @@ const App = () => {
     // Load places data
     useEffect(() => {
       setLoading(true);
-      fetch('/data/places.json')
+      fetch(`${getBasePath()}/data/places.json`)
         .then(response => {
           if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
