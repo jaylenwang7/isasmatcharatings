@@ -125,7 +125,7 @@ def geocode_address(address: str, cache: Dict) -> Optional[Tuple[float, float]]:
     
     try:
         # Respect Nominatim's usage policy with a 1-second delay
-        time.sleep(1)
+        time.sleep(2)
         
         response = requests.get(
             'https://nominatim.openstreetmap.org/search',
@@ -217,7 +217,7 @@ def fetch_and_process_data():
             coordinates = parse_coordinates(record['Lat/Long from Google Maps'])
 
             # If address column, override coordinates with geocoding
-            if address_column in record:
+            if address_column in record and record[address_column].strip():
                 coordinates = geocode_address(record[address_column], coordinates_cache)
             
             # If we still don't have coordinates, log an error and skip
