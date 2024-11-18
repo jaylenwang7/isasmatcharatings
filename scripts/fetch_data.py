@@ -213,15 +213,13 @@ def fetch_and_process_data():
 
             # Try to parse coordinates first
             coordinates = parse_coordinates(record['Lat/Long from Google Maps'])
-            
-            # If coordinates parsing failed, try geocoding the address
-            if not coordinates and address_column in record:
+
+            # If address column, override coordinates with geocoding
+            if address_column in record:
                 coordinates = geocode_address(record[address_column], coordinates_cache)
             
             # If we still don't have coordinates, log an error and skip
             if not coordinates:
-                if address_column not in record:
-                    raise ValueError("No coordinates or address found")
                 raise ValueError("Could not determine coordinates from input")
                 
             lat, lng = coordinates
