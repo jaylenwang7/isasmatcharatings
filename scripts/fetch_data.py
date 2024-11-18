@@ -1,6 +1,6 @@
 import re
 import pandas as pd
-from typing import Tuple, Dict
+from typing import Tuple, Dict, Optional
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from google.oauth2.credentials import Credentials
@@ -12,6 +12,8 @@ import json
 from pathlib import Path
 import hashlib
 from datetime import datetime
+import requests
+import time
 
 def get_safe_filename(name: str, file_id: str) -> str:
     """
@@ -59,61 +61,122 @@ def download_and_save_image(service, file_id: str, place_name: str) -> str:
     except Exception as e:
         raise Exception(f"Error downloading image: {str(e)}")
 
-def parse_coordinates(coord_string: str) -> Tuple[float, float]:
+def parse_coordinates(coord_string: str) -> Optional[Tuple[float, float]]:
     """
     Parse coordinates from various Google Maps formats.
-    Returns tuple of (latitude, longitude)
+    Returns tuple of (latitude, longitude) or None if parsing fails
     """
-    if not isinstance(coord_string, str):
-        raise ValueError(f"Coordinates must be a string, got: {type(coord_string)}")
+    if not isinstance(coord_string, str) or not coord_string.strip():
+        return None
     
     # Remove any extra whitespace
     coord_string = coord_string.strip()
     
-    # Case 1: Simple decimal numbers (37.7749, -122.4194)
-    if ',' in coord_string:
-        try:
-            lat, lng = map(float, coord_string.split(','))
+    try:
+        # Case 1: Simple decimal numbers (37.7749, -122.4194)
+        if ',' in coord_string:
+            try:
+                lat, lng = map(float, coord_string.split(','))
+                return lat, lng
+            except ValueError:
+                pass
+
+        # Case 2: Decimal degrees with directions (37.7749° N, 122.4194° W)
+        decimal_pattern = r'(-?\d+\.?\d*)\s*°?\s*([NS])?[\s,]*(-?\d+\.?\d*)\s*°?\s*([WE])?'
+        match = re.search(decimal_pattern, coord_string)
+        if match:
+            lat, ns, lng, ew = match.groups()
+            lat = float(lat) * (-1 if ns == 'S' else 1)
+            lng = float(lng) * (-1 if ew == 'W' else 1)
             return lat, lng
-        except ValueError:
+
+        # Case 3: Degrees, minutes, seconds (37°46'29.7"N 122°25'09.9"W)
+        dms_pattern = r'''
+            (\d+)°                   # Degrees
+            (\d+)'                   # Minutes
+            (\d+\.?\d*)"?           # Seconds
+            \s*([NS])               # N/S
+            \s*
+            (\d+)°                   # Degrees
+            (\d+)'                   # Minutes
+            (\d+\.?\d*)"?           # Seconds
+            \s*([WE])               # W/E
+        '''
+        match = re.search(dms_pattern, coord_string, re.VERBOSE)
+        if match:
+            lat_d, lat_m, lat_s, ns, lng_d, lng_m, lng_s, ew = match.groups()
+            lat = float(lat_d) + float(lat_m)/60 + float(lat_s)/3600
+            lng = float(lng_d) + float(lng_m)/60 + float(lng_s)/3600
+            lat *= -1 if ns == 'S' else 1
+            lng *= -1 if ew == 'W' else 1
+            return lat, lng
+    except:
+        return None
+    
+    return None
+
+def geocode_address(address: str, cache: Dict) -> Optional[Tuple[float, float]]:
+    """
+    Geocode an address using Nominatim, with caching
+    """
+    if address in cache:
+        return cache[address]['lat'], cache[address]['lng']
+    
+    try:
+        # Respect Nominatim's usage policy with a 1-second delay
+        time.sleep(1)
+        
+        response = requests.get(
+            'https://nominatim.openstreetmap.org/search',
+            params={
+                'q': address,
+                'format': 'json',
+                'limit': 1
+            },
+            headers={'User-Agent': 'IsasMatchaTierList/1.0'}
+        )
+        response.raise_for_status()
+        data = response.json()
+        
+        if data:
+            lat = float(data[0]['lat'])
+            lng = float(data[0]['lon'])
+            cache[address] = {'lat': lat, 'lng': lng}
+            return lat, lng
+    except Exception as e:
+        print(f"Geocoding error for {address}: {str(e)}")
+    
+    return None
+
+def load_coordinates_cache() -> Dict:
+    """
+    Load the coordinates cache from file
+    """
+    cache_path = Path('public/data/coordinates-cache.json')
+    if cache_path.exists():
+        try:
+            with cache_path.open('r', encoding='utf-8') as f:
+                return json.load(f)
+        except:
             pass
+    return {}
 
-    # Case 2: Decimal degrees with directions (37.7749° N, 122.4194° W)
-    decimal_pattern = r'(-?\d+\.?\d*)\s*°?\s*([NS])?[\s,]*(-?\d+\.?\d*)\s*°?\s*([WE])?'
-    match = re.search(decimal_pattern, coord_string)
-    if match:
-        lat, ns, lng, ew = match.groups()
-        lat = float(lat) * (-1 if ns == 'S' else 1)
-        lng = float(lng) * (-1 if ew == 'W' else 1)
-        return lat, lng
-
-    # Case 3: Degrees, minutes, seconds (37°46'29.7"N 122°25'09.9"W)
-    dms_pattern = r'''
-        (\d+)°                   # Degrees
-        (\d+)'                   # Minutes
-        (\d+\.?\d*)"?           # Seconds
-        \s*([NS])               # N/S
-        \s*
-        (\d+)°                   # Degrees
-        (\d+)'                   # Minutes
-        (\d+\.?\d*)"?           # Seconds
-        \s*([WE])               # W/E
-    '''
-    match = re.search(dms_pattern, coord_string, re.VERBOSE)
-    if match:
-        lat_d, lat_m, lat_s, ns, lng_d, lng_m, lng_s, ew = match.groups()
-        lat = float(lat_d) + float(lat_m)/60 + float(lat_s)/3600
-        lng = float(lng_d) + float(lng_m)/60 + float(lng_s)/3600
-        lat *= -1 if ns == 'S' else 1
-        lng *= -1 if ew == 'W' else 1
-        return lat, lng
-
-    raise ValueError("Could not parse coordinates")
+def save_coordinates_cache(cache: Dict):
+    """
+    Save the coordinates cache to file
+    """
+    cache_path = Path('public/data/coordinates-cache.json')
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    with cache_path.open('w', encoding='utf-8') as f:
+        json.dump(cache, f, indent=2, ensure_ascii=False)
 
 def fetch_and_process_data():
     """
     Fetch data from Google Sheets and process coordinates and images
     """
+    # Load the coordinates cache
+    coordinates_cache = load_coordinates_cache()
+    
     # Set up Google Sheets and Drive authentication
     scope = [
         'https://spreadsheets.google.com/feeds',
@@ -139,6 +202,7 @@ def fetch_and_process_data():
     
     # Track which images we've already downloaded
     processed_images = set()
+    address_column = 'Address (copied from Google Maps)'
     
     for idx, record in enumerate(records):
         try:
@@ -146,8 +210,18 @@ def fetch_and_process_data():
             if not record['Place Name'].strip():
                 continue
 
-            # Parse coordinates
-            lat, lng = parse_coordinates(record['Lat/Long from Google Maps'])
+            # Try to parse coordinates first
+            coordinates = parse_coordinates(record['Lat/Long from Google Maps'])
+            
+            # If coordinates parsing failed, try geocoding the address
+            if not coordinates and address_column in record:
+                coordinates = geocode_address(record[address_column], coordinates_cache)
+            
+            # If we still don't have coordinates, log an error and skip
+            if not coordinates:
+                raise ValueError("Could not determine coordinates from input")
+                
+            lat, lng = coordinates
             
             # Extract file ID from the image URL/ID
             image_url = record['Upload a picture!']
@@ -174,6 +248,10 @@ def fetch_and_process_data():
                 'lastUpdated': pd.Timestamp.now().isoformat()
             }
             
+            # Add address if available
+            if address_column in record:
+                processed_place['address'] = record[address_column].strip()
+            
             processed_places.append(processed_place)
             print(f"Successfully processed {record['Place Name']}")
             
@@ -182,6 +260,9 @@ def fetch_and_process_data():
             errors.append(error_msg)
             print(error_msg)
             continue
+    
+    # Save the updated coordinates cache
+    save_coordinates_cache(coordinates_cache)
     
     if errors:
         print("\nProcessing completed with errors:")
@@ -203,6 +284,7 @@ def fetch_and_process_data():
     
     print(f"\nProcessed {len(processed_places)} places successfully")
     print(f"Downloaded {len(processed_images)} images")
+    print(f"Cached {len(coordinates_cache)} coordinates")
     print(f"Skipped {len(errors)} places due to errors")
 
 if __name__ == "__main__":

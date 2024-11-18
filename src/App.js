@@ -226,10 +226,8 @@ const PlaceDetails = ({ place, onClose }) => {
   const tierStyle = TIERS[place.tier];
   
   return (
-    <div 
-      className="bg-white rounded-xl p-6 shadow-lg relative transform transition-all duration-500 
-        ease-in-out origin-top hover:shadow-xl animate-slide-in"
-    >
+    <div className="bg-white rounded-xl p-6 shadow-lg relative transform transition-all duration-500 
+      ease-in-out origin-top hover:shadow-xl animate-slide-in">
       <button
         onClick={onClose}
         className="absolute -top-2 -right-2 text-gray-500 hover:text-gray-700 
@@ -267,9 +265,13 @@ const PlaceDetails = ({ place, onClose }) => {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-bold">{place.name}</h2>
-            <p className="text-xs text-gray-400 mt-1 font-mono">
-              {place.lat.toFixed(6)}, {place.lng.toFixed(6)}
-            </p>
+            {place.address ? (
+              <p className="text-sm text-gray-600 mt-1">{place.address}</p>
+            ) : (
+              <p className="text-xs text-gray-400 mt-1 font-mono">
+                {place.lat.toFixed(6)}, {place.lng.toFixed(6)}
+              </p>
+            )}
           </div>
           <div className={`px-4 py-2 rounded-full ${tierStyle.color} ${tierStyle.textColor} 
             font-medium transform transition-transform duration-200 hover:scale-105`}>
