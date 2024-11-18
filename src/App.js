@@ -12,6 +12,24 @@ L.Icon.Default.mergeOptions({
   shadowUrl: require('leaflet/dist/images/marker-shadow.png'),
 });
 
+// Create custom icons for each tier
+const createTierIcon = (color) => {
+  return L.divIcon({
+    className: 'custom-marker',
+    html: `<div style="
+      width: 25px;
+      height: 25px;
+      background-color: ${color};
+      border: 2px solid white;
+      border-radius: 50%;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    "></div>`,
+    iconSize: [25, 25],
+    iconAnchor: [12, 12],
+    popupAnchor: [0, -12],
+  });
+};
+
 const getBasePath = () => {
   return process.env.PUBLIC_URL || '';
 };
@@ -24,7 +42,8 @@ const TIERS = {
     borderColor: 'border-purple-300',
     gradientFrom: 'from-purple-500',
     gradientTo: 'to-purple-300',
-    description: 'This matcha is good af - the best of the best, would go out of my way for it'
+    description: 'This matcha is good af - the best of the best, would go out of my way for it',
+    markerColor: '#9333ea' // Purple
   },
   A: {
     color: 'bg-green-100 hover:bg-green-200',
@@ -32,7 +51,8 @@ const TIERS = {
     borderColor: 'border-green-300',
     gradientFrom: 'from-green-500',
     gradientTo: 'to-green-300',
-    description: 'Would be happy to have this matcha any day of the week'
+    description: 'Would be happy to have this matcha any day of the week',
+    markerColor: '#22c55e' // Green
   },
   B: {
     color: 'bg-blue-100 hover:bg-blue-200',
@@ -40,7 +60,8 @@ const TIERS = {
     borderColor: 'border-blue-300',
     gradientFrom: 'from-blue-500',
     gradientTo: 'to-blue-300',
-    description: 'Solid choice, would be happy to get this at a cafe'
+    description: 'Solid choice, would be happy to get this at a cafe',
+    markerColor: '#3b82f6' // Blue
   },
   C: {
     color: 'bg-yellow-100 hover:bg-yellow-200',
@@ -48,7 +69,8 @@ const TIERS = {
     borderColor: 'border-yellow-300',
     gradientFrom: 'from-yellow-500',
     gradientTo: 'to-yellow-300',
-    description: 'Decent matcha when you need to order something at a cafe'
+    description: 'Decent matcha when you need to order something at a cafe',
+    markerColor: '#eab308' // Yellow
   },
   D: {
     color: 'bg-orange-100 hover:bg-orange-200',
@@ -56,7 +78,8 @@ const TIERS = {
     borderColor: 'border-orange-300',
     gradientFrom: 'from-orange-500',
     gradientTo: 'to-orange-300',
-    description: 'Bruh, lackluster, would not recommend'
+    description: 'Bruh, lackluster, would not recommend',
+    markerColor: '#f97316' // Orange
   },
   F: {
     color: 'bg-red-100 hover:bg-red-200',
@@ -64,9 +87,18 @@ const TIERS = {
     borderColor: 'border-red-300',
     gradientFrom: 'from-red-500',
     gradientTo: 'to-red-300',
-    description: 'Would avoid and maybe not even finish'
+    description: 'Would avoid and maybe not even finish',
+    markerColor: '#ef4444' // Red
   }
 };
+
+// Create icons for each tier
+const TIER_ICONS = Object.fromEntries(
+  Object.entries(TIERS).map(([tier, config]) => [
+    tier,
+    createTierIcon(config.markerColor)
+  ])
+);
 
 const PhotoGrid = ({ places, onPlaceSelect, isOpen, onClose }) => {
   if (!isOpen) return null;
@@ -296,14 +328,14 @@ const App = () => {
           easeLinearity: 0.25
         });
       }
-    }, 300); // Wait for fade out before showing new place
+    }, 300);
   };
 
   const handleCloseDetails = () => {
     setIsDetailsVisible(false);
     setTimeout(() => {
       setSelectedPlace(null);
-    }, 300); // Wait for fade out animation
+    }, 300);
   };
 
   if (loading) {
@@ -393,6 +425,7 @@ const App = () => {
                   <Marker 
                     key={place.id}
                     position={[place.lat, place.lng]}
+                    icon={TIER_ICONS[place.tier]}
                     eventHandlers={{
                       click: () => handlePlaceSelect(place),
                     }}
