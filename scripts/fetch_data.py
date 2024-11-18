@@ -144,6 +144,8 @@ def geocode_address(address: str, cache: Dict) -> Optional[Tuple[float, float]]:
             lng = float(data[0]['lon'])
             cache[address] = {'lat': lat, 'lng': lng}
             return lat, lng
+        else:
+            print(f"No results found for address: {address}")
     except Exception as e:
         print(f"Geocoding error for {address}: {str(e)}")
     
