@@ -265,7 +265,12 @@ const PlaceDetails = ({ place, onClose }) => {
       
       <div className="mt-6 space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold">{place.name}</h2>
+          <div>
+            <h2 className="text-2xl font-bold">{place.name}</h2>
+            <p className="text-xs text-gray-400 mt-1 font-mono">
+              {place.lat.toFixed(6)}, {place.lng.toFixed(6)}
+            </p>
+          </div>
           <div className={`px-4 py-2 rounded-full ${tierStyle.color} ${tierStyle.textColor} 
             font-medium transform transition-transform duration-200 hover:scale-105`}>
             Tier {place.tier}
