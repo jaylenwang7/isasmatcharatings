@@ -119,6 +119,7 @@ def geocode_address(address: str, cache: Dict) -> Optional[Tuple[float, float]]:
     """
     Geocode an address using Nominatim, with caching
     """
+    print(f"Geocoding address: {address}")
     if address in cache:
         return cache[address]['lat'], cache[address]['lng']
     
@@ -219,6 +220,8 @@ def fetch_and_process_data():
             
             # If we still don't have coordinates, log an error and skip
             if not coordinates:
+                if address_column not in record:
+                    raise ValueError("No coordinates or address found")
                 raise ValueError("Could not determine coordinates from input")
                 
             lat, lng = coordinates
