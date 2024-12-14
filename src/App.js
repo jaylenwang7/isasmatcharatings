@@ -302,6 +302,8 @@ const App = () => {
   const [error, setError] = useState(null);
   const [isDetailsVisible, setIsDetailsVisible] = useState(false);
   const [isPhotoGridOpen, setIsPhotoGridOpen] = useState(false);
+  const [showPittsburghOnly, setShowPittsburghOnly] = useState(false);
+  const [allPlaces, setAllPlaces] = useState([]); // Store all places separately
 
   useEffect(() => {
     setLoading(true);
@@ -312,7 +314,8 @@ const App = () => {
       })
       .then(data => {
         if (!Array.isArray(data)) throw new Error('Data is not in the expected format');
-        setPlaces(data);
+        setAllPlaces(data); // Store all places
+        setPlaces(data);    // Initial places display
         setError(null);
       })
       .catch(error => {
@@ -323,6 +326,34 @@ const App = () => {
         setLoading(false);
       });
   }, []);
+
+  // Filter places when toggle changes
+  useEffect(() => {
+    if (showPittsburghOnly) {
+      // Define Pittsburgh's approximate boundaries
+      const pghBounds = {
+        minLat: 40.35,
+        maxLat: 40.50,
+        minLng: -80.10,
+        maxLng: -79.85
+      };
+      
+      const filteredPlaces = allPlaces.filter(place => 
+        place.lat >= pghBounds.minLat &&
+        place.lat <= pghBounds.maxLat &&
+        place.lng >= pghBounds.minLng &&
+        place.lng <= pghBounds.maxLng
+      );
+      setPlaces(filteredPlaces);
+      
+      // Recenter map on Pittsburgh
+      if (mapRef) {
+        mapRef.flyTo([40.4406, -79.9959], 12);
+      }
+    } else {
+      setPlaces(allPlaces);
+    }
+  }, [showPittsburghOnly, allPlaces, mapRef]);
 
   const handlePlaceSelect = (place) => {
     setIsDetailsVisible(false);
@@ -380,14 +411,26 @@ const App = () => {
                 rated them based on their matcha quality and overall experience.
               </p>
             </div>
-            <button
-              onClick={() => setIsPhotoGridOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-green-100 hover:bg-green-200 
-                text-green-800 rounded-lg transition-colors duration-200 shadow-sm hover:shadow-md"
-            >
-              <Camera size={20} />
-              <span>View Gallery</span>
-            </button>
+            <div className="flex gap-4">
+              <button
+                onClick={() => setShowPittsburghOnly(!showPittsburghOnly)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors duration-200 shadow-sm hover:shadow-md ${
+                  showPittsburghOnly 
+                    ? 'bg-green-600 text-white hover:bg-green-700' 
+                    : 'bg-green-100 text-green-800 hover:bg-green-200'
+                }`}
+              >
+                {showPittsburghOnly ? 'Show All' : 'Pittsburgh Only'}
+              </button>
+              <button
+                onClick={() => setIsPhotoGridOpen(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-green-100 hover:bg-green-200 
+                  text-green-800 rounded-lg transition-colors duration-200 shadow-sm hover:shadow-md"
+              >
+                <Camera size={20} />
+                <span>View Gallery</span>
+              </button>
+            </div>
           </div>
         </div>
       </header>
