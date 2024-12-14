@@ -214,11 +214,19 @@ def fetch_and_process_data():
                 continue
 
             # Try to parse coordinates first
-            coordinates = parse_coordinates(record['Lat/Long from Google Maps'])
+            latlong_coordinates = parse_coordinates(record['Lat/Long from Google Maps'])
 
             # If address column, override coordinates with geocoding
             if address_column in record and record[address_column].strip():
-                coordinates = geocode_address(record[address_column], coordinates_cache)
+                address_coordinates = geocode_address(record[address_column], coordinates_cache)
+
+            # Prefer address coordinates if available
+            if address_coordinates:
+                coordinates = address_coordinates
+            elif latlong_coordinates:
+                coordinates = latlong_coordinates
+            else:
+                coordinates = None
             
             # If we still don't have coordinates, log an error and skip
             if not coordinates:
