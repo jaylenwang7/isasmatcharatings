@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://jaylenwang7.github.io/isasmatcharatings/sitemap.xml

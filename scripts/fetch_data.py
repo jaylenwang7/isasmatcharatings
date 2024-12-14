@@ -125,7 +125,7 @@ def geocode_address(address: str, cache: Dict) -> Optional[Tuple[float, float]]:
     
     try:
         # Respect Nominatim's usage policy with a 1-second delay
-        time.sleep(2)
+        time.sleep(1.2)
         
         response = requests.get(
             'https://nominatim.openstreetmap.org/search',
