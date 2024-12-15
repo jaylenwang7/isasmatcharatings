@@ -222,8 +222,10 @@ def fetch_and_process_data():
 
             # Prefer address coordinates if available
             if address_coordinates:
+                print(f"Using geocoded coordinates for {record['Place Name']}")
                 coordinates = address_coordinates
             elif latlong_coordinates:
+                print(f"Using lat/long coordinates for {record['Place Name']}")
                 coordinates = latlong_coordinates
             else:
                 coordinates = None
