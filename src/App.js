@@ -131,7 +131,7 @@ const PhotoGrid = ({ places, onPlaceSelect, isOpen, onClose }) => {
   if (!isOpen) return null;
 
   // Filter out places without images but keep places with imagePath: null to show placeholder
-  const validPlaces = places.filter(place => true);  // Keep all places
+  const validPlaces = places.filter(place => place.imagePath !== undefined);
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[1001] overflow-y-auto">
