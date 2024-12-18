@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
-import { Camera, X } from 'lucide-react';
+import { Camera, Bridge, X } from 'lucide-react';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
@@ -131,7 +131,7 @@ const PhotoGrid = ({ places, onPlaceSelect, isOpen, onClose }) => {
   if (!isOpen) return null;
 
   // Filter out places without images but keep places with imagePath: null to show placeholder
-  const validPlaces = places.filter(place => place.imagePath !== undefined);
+  const validPlaces = places.filter(place => place.imagePath);
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[1001] overflow-y-auto">
@@ -197,7 +197,7 @@ const TierList = ({ places, onPlaceSelect }) => {
               bg-white/95 backdrop-blur-sm p-4 rounded-lg shadow-lg z-10 transition-all duration-300
               ${expandedTier === tier ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2 pointer-events-none'}`}
           >
-            <p className="text-gray-700 leading-relaxed">{TIERS[tier].description}</p>
+            <p className="text-gray-700 leading-relaxed text-sm line-clamp-3">{TIERS[tier].description}</p>
           </div>
           
           <div 
@@ -207,7 +207,7 @@ const TierList = ({ places, onPlaceSelect }) => {
             onMouseLeave={() => setExpandedTier(null)}
           >
             <div className="flex items-center gap-6">
-              <div className={`w-16 h-16 flex items-center justify-center text-3xl font-bold 
+              <div className={`w-16 h-16 flex-shrink-0 flex items-center justify-center text-3xl font-bold 
                 bg-gradient-to-br ${TIERS[tier].gradientFrom} ${TIERS[tier].gradientTo} 
                 rounded-lg shadow-inner text-white transform transition-transform duration-200 
                 hover:scale-110`}>
@@ -217,7 +217,7 @@ const TierList = ({ places, onPlaceSelect }) => {
                 {places.filter(place => place.tier === tier).map(place => (
                   <div 
                     key={place.id}
-                    className={`relative group p-3 rounded-lg cursor-pointer 
+                    className={`relative group p-3 rounded-lg cursor-pointer w-full sm:w-[calc(50%-0.75rem)]
                       ${TIERS[tier].color} transform transition-all duration-200 
                       hover:scale-105 hover:shadow-md`}
                     onClick={(e) => {
@@ -226,10 +226,17 @@ const TierList = ({ places, onPlaceSelect }) => {
                     }}
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full overflow-hidden shadow-inner">
+                      <div className="w-10 h-10 flex-shrink-0 rounded-full overflow-hidden shadow-inner">
                         <PlaceImage imagePath={place.imagePath} name={place.name} size="small" />
                       </div>
-                      <span className="font-medium">{place.name}</span>
+                      <div className="min-w-0 flex-1">
+                        <span className="font-medium text-sm block truncate">{place.name}</span>
+                        {place.address && (
+                          <span className="text-xs text-gray-600 block truncate">
+                            {place.address}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -442,13 +449,14 @@ const App = () => {
             <div className="flex gap-4">
               <button
                 onClick={() => setShowPittsburghOnly(!showPittsburghOnly)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors duration-200 shadow-sm hover:shadow-md ${
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 shadow-sm hover:shadow-md ${
                   showPittsburghOnly 
-                    ? 'bg-green-600 text-white hover:bg-green-700' 
-                    : 'bg-green-100 text-green-800 hover:bg-green-200'
+                    ? 'bg-black text-yellow-300 hover:bg-gray-800' 
+                    : 'bg-yellow-300 text-black hover:bg-yellow-400'
                 }`}
               >
-                {showPittsburghOnly ? 'Show All' : 'Pittsburgh Only'}
+                <Bridge size={18} className={showPittsburghOnly ? 'text-yellow-300' : 'text-black'} />
+                <span>{showPittsburghOnly ? 'Show All' : 'Pittsburgh Only'}</span>
               </button>
               <button
                 onClick={() => setIsPhotoGridOpen(true)}
