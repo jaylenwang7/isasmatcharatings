@@ -158,7 +158,11 @@ const PhotoGrid = ({ places, onPlaceSelect, isOpen, onClose }) => {
               }}
             >
               <div className="aspect-square">
-                <PlaceImage imagePath={place.imagePath} name={place.name} size="normal" />
+                <img
+                  src={`${getBasePath()}/${place.imagePath}`}
+                  alt={place.name}
+                  className="w-full h-full object-cover"
+                />
               </div>
               <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent 
                 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
@@ -260,11 +264,18 @@ const PlaceDetails = ({ place, onClose }) => {
       
       <div className="relative">
         <div className="relative overflow-hidden rounded-xl">
-          <PlaceImage 
-            imagePath={place.imagePath} 
-            name={place.name}
-            size={isImageExpanded ? "large" : "normal"}
-          />
+          {place.imagePath && (
+            <img 
+              src={`${getBasePath()}/${place.imagePath}`} 
+              alt={place.name}
+              className={`w-full transition-all duration-500 ease-in-out ${
+                isImageExpanded 
+                  ? 'h-auto max-h-[600px] object-contain' 
+                  : 'h-56 object-cover'
+              }`}
+              onClick={() => setIsImageExpanded(!isImageExpanded)}
+            />
+          )}
           {place.imagePath && (
             <button
               onClick={() => setIsImageExpanded(!isImageExpanded)}
