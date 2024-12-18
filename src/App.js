@@ -100,8 +100,38 @@ const TIER_ICONS = Object.fromEntries(
   ])
 );
 
+const PlaceImage = ({ imagePath, name, size = "normal" }) => {
+  // Helper component to handle image display with fallback
+  const sizeClasses = {
+    small: "w-10 h-10",
+    normal: "h-56",
+    large: "max-h-[600px]"
+  };
+
+  if (!imagePath) {
+    return (
+      <img 
+        src={`${getBasePath()}/images/matcha.png`}
+        alt="Matcha placeholder"
+        className={`${sizeClasses[size]} object-cover bg-gray-100`}
+      />
+    );
+  }
+
+  return (
+    <img 
+      src={`${getBasePath()}/${imagePath}`}
+      alt={name}
+      className={`${sizeClasses[size]} ${size === 'normal' ? 'object-cover' : 'object-cover'}`}
+    />
+  );
+};
+
 const PhotoGrid = ({ places, onPlaceSelect, isOpen, onClose }) => {
   if (!isOpen) return null;
+
+  // Filter out places without images but keep places with imagePath: null to show placeholder
+  const validPlaces = places.filter(place => true);  // Keep all places
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[1001] overflow-y-auto">
@@ -117,7 +147,7 @@ const PhotoGrid = ({ places, onPlaceSelect, isOpen, onClose }) => {
         </div>
         
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          {places.map((place) => (
+          {validPlaces.map((place) => (
             <div
               key={place.id}
               className="group relative bg-white rounded-xl overflow-hidden shadow-lg 
@@ -128,11 +158,7 @@ const PhotoGrid = ({ places, onPlaceSelect, isOpen, onClose }) => {
               }}
             >
               <div className="aspect-square">
-                <img
-                  src={`${getBasePath()}/${place.imagePath}`}
-                  alt={place.name}
-                  className="w-full h-full object-cover"
-                />
+                <PlaceImage imagePath={place.imagePath} name={place.name} size="normal" />
               </div>
               <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent 
                 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
@@ -196,15 +222,9 @@ const TierList = ({ places, onPlaceSelect }) => {
                     }}
                   >
                     <div className="flex items-center gap-3">
-                      {place.imagePath && (
-                        <div 
-                          className="w-10 h-10 rounded-full overflow-hidden bg-center bg-cover 
-                            shadow-inner transition-opacity duration-200 opacity-75 group-hover:opacity-100"
-                          style={{
-                            backgroundImage: `url(${getBasePath()}/${place.imagePath})`
-                          }}
-                        />
-                      )}
+                      <div className="w-10 h-10 rounded-full overflow-hidden shadow-inner">
+                        <PlaceImage imagePath={place.imagePath} name={place.name} size="small" />
+                      </div>
                       <span className="font-medium">{place.name}</span>
                     </div>
                   </div>
@@ -240,24 +260,21 @@ const PlaceDetails = ({ place, onClose }) => {
       
       <div className="relative">
         <div className="relative overflow-hidden rounded-xl">
-          <img 
-            src={`${getBasePath()}/${place.imagePath}`} 
-            alt={place.name}
-            className={`w-full transition-all duration-500 ease-in-out ${
-              isImageExpanded 
-                ? 'h-auto max-h-[600px] object-contain' 
-                : 'h-56 object-cover'
-            }`}
-            onClick={() => setIsImageExpanded(!isImageExpanded)}
+          <PlaceImage 
+            imagePath={place.imagePath} 
+            name={place.name}
+            size={isImageExpanded ? "large" : "normal"}
           />
-          <button
-            onClick={() => setIsImageExpanded(!isImageExpanded)}
-            className="absolute bottom-4 right-4 bg-white/90 hover:bg-white px-4 py-2 
-              rounded-full text-sm text-gray-700 shadow-md hover:shadow-lg 
-              transition-all duration-200 backdrop-blur-sm"
-          >
-            {isImageExpanded ? 'Show less' : 'Show more'}
-          </button>
+          {place.imagePath && (
+            <button
+              onClick={() => setIsImageExpanded(!isImageExpanded)}
+              className="absolute bottom-4 right-4 bg-white/90 hover:bg-white px-4 py-2 
+                rounded-full text-sm text-gray-700 shadow-md hover:shadow-lg 
+                transition-all duration-200 backdrop-blur-sm"
+            >
+              {isImageExpanded ? 'Show less' : 'Show more'}
+            </button>
+          )}
         </div>
       </div>
       

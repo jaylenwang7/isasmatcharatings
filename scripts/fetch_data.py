@@ -26,11 +26,44 @@ def get_safe_filename(name: str, file_id: str) -> str:
     file_hash = hashlib.md5(file_id.encode()).hexdigest()[:6]
     return f"{safe_name}-{timestamp}-{file_hash}.jpg"
 
-def download_and_save_image(service, file_id: str, place_name: str) -> str:
+def extract_file_id(url: str) -> Optional[str]:
+    """
+    Extract Google Drive file ID from various URL formats
+    Returns None if no valid file ID is found
+    """
+    if not url or not isinstance(url, str):
+        return None
+        
+    url = url.strip()
+    
+    # If it's already just a file ID (no slashes or spaces), return it
+    if len(url) > 25 and '/' not in url and ' ' not in url:
+        return url
+        
+    # Common Google Drive URL patterns
+    patterns = [
+        r'/d/([a-zA-Z0-9_-]{25,})',  # /d/{fileId}/
+        r'id=([a-zA-Z0-9_-]{25,})',  # id={fileId}
+        r'/file/d/([a-zA-Z0-9_-]{25,})',  # /file/d/{fileId}
+        r'drive\.google\.com/open\?id=([a-zA-Z0-9_-]{25,})'  # open?id={fileId}
+    ]
+    
+    for pattern in patterns:
+        match = re.search(pattern, url)
+        if match:
+            return match.group(1)
+    
+    return None
+
+def download_and_save_image(service, file_id: str, place_name: str) -> Optional[str]:
     """
     Download image from Google Drive and save it to the repository
-    Returns the path where the image was saved
+    Returns the path where the image was saved, or None if download fails
     """
+    if not file_id or file_id.strip() == '':
+        print(f"No image ID provided for {place_name}")
+        return None
+        
     try:
         # Create images directory if it doesn't exist
         images_dir = Path('public/images')
@@ -59,7 +92,8 @@ def download_and_save_image(service, file_id: str, place_name: str) -> str:
         return f"images/{filename}"
 
     except Exception as e:
-        raise Exception(f"Error downloading image: {str(e)}")
+        print(f"Error downloading image for {place_name}: {str(e)}")
+        return None
 
 def parse_coordinates(coord_string: str) -> Optional[Tuple[float, float]]:
     """
@@ -237,17 +271,22 @@ def fetch_and_process_data():
             lat, lng = coordinates
             
             # Extract file ID from the image URL/ID
-            image_url = record['Upload a picture!']
-            file_id = image_url.split('=')[-1] if '=' in image_url else image_url
+            image_path = None
+            image_url = record.get('Upload a picture!', '').strip()
             
-            # Download image if we haven't already
-            if file_id not in processed_images:
-                image_path = download_and_save_image(
-                    drive_service, 
-                    file_id,
-                    record['Place Name']
-                )
-                processed_images.add(file_id)
+            if image_url:
+                file_id = extract_file_id(image_url)
+                if file_id:
+                    if file_id not in processed_images:
+                        image_path = download_and_save_image(
+                            drive_service, 
+                            file_id,
+                            record['Place Name']
+                        )
+                        if image_path:
+                            processed_images.add(file_id)
+                else:
+                    print(f"Could not extract valid file ID from URL for {record['Place Name']}: {image_url}")
             
             processed_place = {
                 'id': idx,
@@ -255,7 +294,7 @@ def fetch_and_process_data():
                 'tier': record['Tier Rating'].strip().upper(),
                 'ordered': record['What did you order?'].strip(),
                 'notes': record['Notes'].strip(),
-                'imagePath': image_path,
+                'imagePath': image_path,  # This will be None if no image or download failed
                 'lat': lat,
                 'lng': lng,
                 'lastUpdated': pd.Timestamp.now().isoformat()
