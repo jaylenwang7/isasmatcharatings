@@ -130,7 +130,7 @@ const PlaceImage = ({ imagePath, name, size = "normal" }) => {
 const PhotoGrid = ({ places, onPlaceSelect, isOpen, onClose }) => {
   if (!isOpen) return null;
 
-  // Filter out places without images but keep places with imagePath: null to show placeholder
+  // Filter out places without images
   const validPlaces = places.filter(place => place.imagePath);
 
   return (
@@ -150,8 +150,10 @@ const PhotoGrid = ({ places, onPlaceSelect, isOpen, onClose }) => {
           {validPlaces.map((place) => (
             <div
               key={place.id}
-              className="group relative bg-white rounded-xl overflow-hidden shadow-lg 
-                transform transition-all duration-300 hover:scale-105 cursor-pointer"
+              className={`group relative bg-white rounded-xl overflow-hidden shadow-lg 
+                transform transition-all duration-300 hover:scale-105 cursor-pointer
+                ring-4 ring-offset-2 ring-offset-black/70
+                ${TIERS[place.tier].textColor.replace('text', 'ring')}`}
               onClick={() => {
                 onPlaceSelect(place);
                 onClose();
