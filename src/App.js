@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
-import { Camera, Bridge, X } from 'lucide-react';
+import { Camera, X } from 'lucide-react';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
@@ -455,7 +455,13 @@ const App = () => {
                     : 'bg-yellow-300 text-black hover:bg-yellow-400'
                 }`}
               >
-                <Bridge size={18} className={showPittsburghOnly ? 'text-yellow-300' : 'text-black'} />
+                <img 
+                  src={`${getBasePath()}/images/bridge.png`}
+                  alt="Bridge icon" 
+                  className={`w-5 h-5 object-contain ${
+                    showPittsburghOnly ? 'brightness-0 invert' : 'brightness-100'
+                  }`}
+                />
                 <span>{showPittsburghOnly ? 'Show All' : 'Pittsburgh Only'}</span>
               </button>
               <button
