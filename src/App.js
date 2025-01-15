@@ -13,20 +13,24 @@ L.Icon.Default.mergeOptions({
 });
 
 // Create custom icons for each tier
-const createTierIcon = (color) => {
+const createTierIcon = (color, isSelected = false) => {
+  const size = isSelected ? 35 : 25;
+  const borderWidth = isSelected ? 4 : 2;
+  
   return L.divIcon({
     className: 'custom-marker',
     html: `<div style="
-      width: 25px;
-      height: 25px;
+      width: ${size}px;
+      height: ${size}px;
       background-color: ${color};
-      border: 2px solid white;
-      border-radius: 50%;
+      border: ${borderWidth}px solid white;
+      border-radius: ${isSelected ? '4px' : '50%'};
       box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      transform: ${isSelected ? 'rotate(45deg)' : 'none'};
     "></div>`,
-    iconSize: [25, 25],
-    iconAnchor: [12, 12],
-    popupAnchor: [0, -12],
+    iconSize: [size, size],
+    iconAnchor: [size/2, size/2],
+    popupAnchor: [0, -size/2],
   });
 };
 
@@ -93,12 +97,13 @@ const TIERS = {
 };
 
 // Create icons for each tier
-const TIER_ICONS = Object.fromEntries(
-  Object.entries(TIERS).map(([tier, config]) => [
-    tier,
-    createTierIcon(config.markerColor)
-  ])
-);
+const TIER_ICONS = {};
+Object.entries(TIERS).forEach(([tier, config]) => {
+  TIER_ICONS[tier] = {
+    default: createTierIcon(config.markerColor),
+    selected: createTierIcon(config.markerColor, true)
+  };
+});
 
 const PlaceImage = ({ imagePath, name, size = "normal" }) => {
   // Helper component to handle image display with fallback
@@ -228,7 +233,7 @@ const TierList = ({ places, onPlaceSelect, setActiveView }) => {
                 rounded-lg shadow-inner text-white`}>
                 {tier}
               </div>
-              <div className="flex flex-wrap gap-2 sm:gap-3 flex-1">
+              <div className="flex flex-wrap gap-2 sm:gap-3 flex-1 min-w-0">
                 {places.filter(place => place.tier === tier).map(place => (
                   <div 
                     key={place.id}
@@ -244,11 +249,11 @@ const TierList = ({ places, onPlaceSelect, setActiveView }) => {
                       }
                     }}
                   >
-                    <div className="flex items-center gap-2 sm:gap-3">
+                    <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                       <div className="w-8 h-8 sm:w-10 sm:h-10 flex-shrink-0 rounded-full overflow-hidden shadow-inner">
                         <PlaceImage imagePath={place.imagePath} name={place.name} size="small" />
                       </div>
-                      <div className="min-w-0 flex-1">
+                      <div className="min-w-0 flex-1 overflow-hidden">
                         <span className="font-medium text-sm block truncate">{place.name}</span>
                         {place.address && (
                           <span className="text-xs text-gray-600 block truncate">
@@ -460,8 +465,8 @@ const App = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-gray-50">
-      <header className="bg-white/80 backdrop-blur-sm shadow-sm sticky top-0 z-[1000]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-8">
+      <header className="bg-white/80 backdrop-blur-sm shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
             <div>
               <h1 className="text-2xl sm:text-4xl font-bold text-gray-900 flex items-center gap-2">
@@ -470,7 +475,12 @@ const App = () => {
                   🍵
                 </span>
               </h1>
-              <p className="mt-2 text-sm sm:text-base text-gray-600 leading-relaxed max-w-2xl">
+              <p className="mt-2 text-sm sm:text-base text-gray-600 leading-relaxed max-w-2xl transition-opacity duration-300"
+                 style={{ 
+                   opacity: window.scrollY > 50 ? 0 : 1,
+                   height: window.scrollY > 50 ? 0 : 'auto',
+                   overflow: 'hidden'
+                 }}>
                 This is Isa's definitive matcha tier list! Isa has visited all these places and 
                 rated them based on their matcha quality and overall experience.
               </p>
@@ -492,7 +502,7 @@ const App = () => {
                   }`}
                 />
                 <span className="hidden sm:inline">{showPittsburghOnly ? 'Show All' : 'Pittsburgh Only'}</span>
-                <span className="sm:hidden">PGH</span>
+                <span className="sm:hidden">{showPittsburghOnly ? 'Show All' : 'PGH'}</span>
               </button>
               <button
                 onClick={() => setIsPhotoGridOpen(true)}
@@ -508,10 +518,10 @@ const App = () => {
           </div>
         </div>
       </header>
-
-      {/* Mobile View Switcher */}
-      <div className="sm:hidden sticky top-[72px] z-[999] bg-white/80 backdrop-blur-sm shadow-sm">
-        <div className="flex justify-center gap-2 p-2">
+      
+      {/* View Switcher - Now sticky for both mobile and desktop */}
+      <div className="sticky top-0 z-[999] bg-white/80 backdrop-blur-sm shadow-sm">
+        <div className="flex justify-center gap-2 p-2 max-w-7xl mx-auto">
           <button
             onClick={() => setActiveView('list')}
             className={`flex-1 max-w-[160px] flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-colors duration-200
@@ -527,7 +537,7 @@ const App = () => {
               ${showViewHint ? 'animate-pulse' : ''}`}
           >
             <Map size={16} />
-            <span>Map</span>
+            <span>Map & Info</span>
             {showViewHint && (
               <span className="absolute -top-2 -right-2 flex h-4 w-4">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
@@ -539,6 +549,7 @@ const App = () => {
       </div>
 
       <main className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-10">
+        {/* Rest of the layout remains similar */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-10">
           {/* List View */}
           <div className={`z-[900] ${activeView === 'list' ? 'block' : 'hidden sm:block'}`}>
@@ -581,7 +592,9 @@ const App = () => {
                   <Marker 
                     key={place.id}
                     position={[place.lat, place.lng]}
-                    icon={TIER_ICONS[place.tier]}
+                    icon={selectedPlace && selectedPlace.id === place.id 
+                      ? TIER_ICONS[place.tier].selected 
+                      : TIER_ICONS[place.tier].default}
                     eventHandlers={{
                       click: () => handlePlaceSelect(place),
                     }}
