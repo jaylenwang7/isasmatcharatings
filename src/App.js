@@ -578,13 +578,12 @@ const App = () => {
             />
           </div>
           
-          {/* Map and Details View*/}
-          <div className={`space-y-4 sm:space-y-10 ${activeView === 'map' ? 'block' : 'hidden lg:block'}`}>
-            {/* Details container with maintained height */}
-            <div className={`relative z-[900] transition-all duration-300 ease-in-out
-              ${selectedPlace ? 'min-h-[200px]' : 'min-h-0'}`}>
-              <div className={`absolute w-full transition-all duration-300 ease-in-out
-                ${isDetailsVisible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4 pointer-events-none'}`}>
+          {/* Map and Details View - Updated container structure */}
+          <div className={`${activeView === 'map' ? 'block' : 'hidden lg:block'}`}>
+            <div className="flex flex-col gap-4 sm:gap-10">
+              {/* Details Section */}
+              <div className={`transition-all duration-300 ease-in-out overflow-hidden
+                ${isDetailsVisible ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'}`}>
                 {selectedPlace && (
                   <PlaceDetails 
                     place={selectedPlace} 
@@ -592,45 +591,45 @@ const App = () => {
                   />
                 )}
               </div>
-            </div>
-            
-            {/* Map container remains the same */}
-            <div className="h-[400px] sm:h-[500px] rounded-xl overflow-hidden shadow-lg relative z-[800]
-                          transform transition-all duration-500 hover:shadow-2xl">
-              <MapContainer 
-                center={[40.443394552756146, -79.94169118980099]} 
-                zoom={12}
-                style={{ height: '100%', width: '100%' }}
-                ref={setMapRef}
-                preferCanvas={true}
-                updateWhenZooming={false}
-                updateWhenIdle={true}
-                zoomDelta={1}
-                zoomSnap={1}
-              >
-                <TileLayer 
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                  maxNativeZoom={18}
-                  maxZoom={18}
-                />
-                {places.map(place => (
-                  <Marker 
-                    key={place.id}
-                    position={[place.lat, place.lng]}
-                    icon={selectedPlace && selectedPlace.id === place.id 
-                      ? TIER_ICONS[place.tier].selected 
-                      : TIER_ICONS[place.tier].default}
-                    eventHandlers={{
-                      click: () => handlePlaceSelect(place),
-                    }}
-                  >
-                    <Popup>
-                      <div className="font-medium">{place.name}</div>
-                      <div className="text-sm text-gray-600">Tier {place.tier}</div>
-                    </Popup>
-                  </Marker>
-                ))}
-              </MapContainer>
+              
+              {/* Map Section */}
+              <div className="h-[400px] sm:h-[500px] rounded-xl overflow-hidden shadow-lg
+                           transform transition-all duration-500 hover:shadow-2xl">
+                <MapContainer 
+                  center={[40.443394552756146, -79.94169118980099]} 
+                  zoom={12}
+                  style={{ height: '100%', width: '100%' }}
+                  ref={setMapRef}
+                  preferCanvas={true}
+                  updateWhenZooming={false}
+                  updateWhenIdle={true}
+                  zoomDelta={1}
+                  zoomSnap={1}
+                >
+                  <TileLayer 
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    maxNativeZoom={18}
+                    maxZoom={18}
+                  />
+                  {places.map(place => (
+                    <Marker 
+                      key={place.id}
+                      position={[place.lat, place.lng]}
+                      icon={selectedPlace && selectedPlace.id === place.id 
+                        ? TIER_ICONS[place.tier].selected 
+                        : TIER_ICONS[place.tier].default}
+                      eventHandlers={{
+                        click: () => handlePlaceSelect(place),
+                      }}
+                    >
+                      <Popup>
+                        <div className="font-medium">{place.name}</div>
+                        <div className="text-sm text-gray-600">Tier {place.tier}</div>
+                      </Popup>
+                    </Marker>
+                  ))}
+                </MapContainer>
+              </div>
             </div>
           </div>
         </div>
