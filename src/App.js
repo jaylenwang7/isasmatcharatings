@@ -414,7 +414,7 @@ const App = () => {
     }
   }, [showPittsburghOnly, allPlaces, mapRef]);
 
-  // Updated place selection handler with improved desktop animation
+  // Updated place selection handler with fixed mobile behavior
   const handlePlaceSelect = (place) => {
     const isMobile = window.innerWidth < 640;
     
@@ -458,6 +458,18 @@ const App = () => {
     setTimeout(() => {
       setSelectedPlace(null);
     }, 300);
+  };
+
+  // Add view change handler to manage transitions
+  const handleViewChange = (view) => {
+    if (view === 'list') {
+      setIsDetailsVisible(false);
+      setTimeout(() => {
+        setActiveView(view);
+      }, 300);
+    } else {
+      setActiveView(view);
+    }
   };
 
   if (loading) {
