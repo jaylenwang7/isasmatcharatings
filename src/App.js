@@ -201,7 +201,7 @@ const PhotoGrid = ({ places, onPlaceSelect, isOpen, onClose }) => {
 
 
 
-const TierList = ({ places, onPlaceSelect }) => {
+const TierList = ({ places, onPlaceSelect, setActiveView }) => {
   const [expandedTier, setExpandedTier] = useState(null);
   
   return (
@@ -549,6 +549,7 @@ const App = () => {
             <TierList 
               places={places} 
               onPlaceSelect={handlePlaceSelect}
+              setActiveView={setActiveView}
             />
           </div>
           
