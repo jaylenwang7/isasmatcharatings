@@ -418,33 +418,34 @@ const App = () => {
   const handlePlaceSelect = (place) => {
     const isMobile = window.innerWidth < 640;
     
+    // Always set the selected place first
+    setSelectedPlace(place);
+    
     if (isMobile) {
-      // On mobile, switch view immediately and show details after a short delay
+      // On mobile: First switch to map view
       setActiveView('map');
-      setSelectedPlace(place);
       
-      // Ensure map centers on location
+      // Then center the map (if it exists)
       if (mapRef) {
         mapRef.flyTo([place.lat, place.lng], 15, {
           duration: 1
         });
       }
       
-      // Short delay before showing details on mobile
+      // Show details after a short delay to allow for view transition
+      // Hide details first to ensure animation plays
+      setIsDetailsVisible(false);
       setTimeout(() => {
         setIsDetailsVisible(true);
-      }, 300);
+      }, 100);
     } else {
-      // On desktop, animate map first, then show details
-      setSelectedPlace(place);
-      
+      // On desktop: Animate map first, then show details
       if (mapRef) {
-        // First zoom to location
         mapRef.flyTo([place.lat, place.lng], 15, {
           duration: 1.2
         });
         
-        // Show details after map animation
+        setIsDetailsVisible(false);
         setTimeout(() => {
           setIsDetailsVisible(true);
         }, 1200);
@@ -528,14 +529,11 @@ const App = () => {
         </div>
       </header>
       
-      {/* View Switcher - Only visible on mobile */}
+      {/* Updated View Switcher */}
       <div className="sm:hidden sticky top-0 z-[999] bg-white/80 backdrop-blur-sm shadow-sm">
         <div className="flex justify-center gap-2 p-2">
           <button
-            onClick={() => {
-              setActiveView('list');
-              setIsDetailsVisible(false);
-            }}
+            onClick={() => handleViewChange('list')}
             className={`flex-1 max-w-[160px] flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-colors duration-200
               ${activeView === 'list' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}
           >
@@ -543,7 +541,7 @@ const App = () => {
             <span>List</span>
           </button>
           <button
-            onClick={() => setActiveView('map')}
+            onClick={() => handleViewChange('map')}
             className={`flex-1 max-w-[160px] flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-colors duration-200
               ${activeView === 'map' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}
           >
@@ -568,24 +566,23 @@ const App = () => {
             />
           </div>
           
-          {/* Map and Details View */}
+          {/* Map and Details View*/}
           <div className={`space-y-4 sm:space-y-10 ${activeView === 'map' ? 'block' : 'hidden lg:block'}`}>
-            <div className="relative z-[900] transition-all duration-300 ease-in-out"
-                 style={{ 
-                   opacity: isDetailsVisible ? 1 : 0,
-                   transform: isDetailsVisible ? 'translateY(0)' : 'translateY(-20px)',
-                   pointerEvents: isDetailsVisible ? 'auto' : 'none',
-                   height: isDetailsVisible ? 'auto' : '0px',
-                   overflow: 'hidden'
-                 }}>
-              {selectedPlace && (
-                <PlaceDetails 
-                  place={selectedPlace} 
-                  onClose={handleCloseDetails}
-                />
-              )}
+            {/* Details container with maintained height */}
+            <div className={`relative z-[900] transition-all duration-300 ease-in-out
+              ${selectedPlace ? 'min-h-[200px]' : 'min-h-0'}`}>
+              <div className={`absolute w-full transition-all duration-300 ease-in-out
+                ${isDetailsVisible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4 pointer-events-none'}`}>
+                {selectedPlace && (
+                  <PlaceDetails 
+                    place={selectedPlace} 
+                    onClose={handleCloseDetails}
+                  />
+                )}
+              </div>
             </div>
             
+            {/* Map container remains the same */}
             <div className="h-[400px] sm:h-[500px] rounded-xl overflow-hidden shadow-lg relative z-[800]
                           transform transition-all duration-500 hover:shadow-2xl">
               <MapContainer 
