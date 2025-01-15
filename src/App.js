@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
-import { Camera, X } from 'lucide-react';
+import { Camera, X, Map, ListFilter } from 'lucide-react';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
@@ -104,8 +104,8 @@ const PlaceImage = ({ imagePath, name, size = "normal" }) => {
   // Helper component to handle image display with fallback
   const sizeClasses = {
     small: "w-10 h-10",
-    normal: "h-56",
-    large: "max-h-[600px]"
+    normal: "h-40 sm:h-56",
+    large: "max-h-[400px] sm:max-h-[600px]"
   };
 
   if (!imagePath) {
@@ -133,11 +133,24 @@ const PhotoGrid = ({ places, onPlaceSelect, isOpen, onClose }) => {
   // Filter out places without images
   const validPlaces = places.filter(place => place.imagePath);
 
+  // Helper function to convert color class to RGB
+  const getTierColor = (tier) => {
+    switch (tier) {
+      case 'S': return 'rgb(147, 51, 234)'; // Purple
+      case 'A': return 'rgb(34, 197, 94)';  // Green
+      case 'B': return 'rgb(59, 130, 246)'; // Blue
+      case 'C': return 'rgb(234, 179, 8)';  // Yellow
+      case 'D': return 'rgb(249, 115, 22)'; // Orange
+      case 'F': return 'rgb(239, 68, 68)';  // Red
+      default: return 'rgb(59, 130, 246)';  // Default blue
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[1001] overflow-y-auto">
-      <div className="max-w-7xl mx-auto px-6 py-20">
-        <div className="flex justify-between items-center mb-8">
-          <h2 className="text-3xl font-bold text-white">Photo Gallery</h2>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 sm:py-20">
+        <div className="flex justify-between items-center mb-6 sm:mb-8">
+          <h2 className="text-2xl sm:text-3xl font-bold text-white">Photo Gallery</h2>
           <button
             onClick={onClose}
             className="text-white hover:text-gray-200 transition-colors"
@@ -146,14 +159,15 @@ const PhotoGrid = ({ places, onPlaceSelect, isOpen, onClose }) => {
           </button>
         </div>
         
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
           {validPlaces.map((place) => (
             <div
               key={place.id}
-              className={`group relative bg-white rounded-xl overflow-hidden shadow-lg 
-                transform transition-all duration-300 hover:scale-105 cursor-pointer
-                ring-4 ring-offset-2 ring-offset-black/70
-                ${TIERS[place.tier].textColor.replace('text', 'ring')}`}
+              className="group relative bg-white rounded-xl overflow-hidden shadow-lg 
+                transform transition-all duration-300 hover:scale-105 cursor-pointer"
+              style={{
+                boxShadow: `0 0 0 4px ${getTierColor(place.tier)}`
+              }}
               onClick={() => {
                 onPlaceSelect(place);
                 onClose();
@@ -166,12 +180,11 @@ const PhotoGrid = ({ places, onPlaceSelect, isOpen, onClose }) => {
                   className="w-full h-full object-cover"
                 />
               </div>
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent 
-                opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                <div className="absolute bottom-0 left-0 right-0 p-4 text-white">
-                  <h3 className="font-semibold text-lg">{place.name}</h3>
+              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent">
+                <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-4 text-white">
+                  <h3 className="font-semibold text-base sm:text-lg">{place.name}</h3>
                   <div className="flex items-center gap-2 mt-1">
-                    <span className={`px-2 py-1 rounded-full text-sm 
+                    <span className={`px-2 py-1 rounded-full text-xs sm:text-sm 
                       ${TIERS[place.tier].color} ${TIERS[place.tier].textColor}`}>
                       Tier {place.tier}
                     </span>
@@ -340,7 +353,8 @@ const App = () => {
   const [isDetailsVisible, setIsDetailsVisible] = useState(false);
   const [isPhotoGridOpen, setIsPhotoGridOpen] = useState(false);
   const [showPittsburghOnly, setShowPittsburghOnly] = useState(false);
-  const [allPlaces, setAllPlaces] = useState([]); // Store all places separately
+  const [allPlaces, setAllPlaces] = useState([]);
+  const [activeView, setActiveView] = useState('list');
 
   useEffect(() => {
     setLoading(true);
@@ -434,24 +448,24 @@ const App = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-gray-50">
       <header className="bg-white/80 backdrop-blur-sm shadow-sm sticky top-0 z-[1000]">
-        <div className="max-w-7xl mx-auto px-6 py-8">
-          <div className="flex justify-between items-start">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-8">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
             <div>
-              <h1 className="text-4xl font-bold text-gray-900 flex items-center gap-3">
+              <h1 className="text-2xl sm:text-4xl font-bold text-gray-900 flex items-center gap-2">
                 Isa's Matcha Tier List 
-                <span className="text-3xl transform hover:scale-125 transition-transform duration-300 cursor-default">
+                <span className="text-2xl sm:text-3xl transform hover:scale-125 transition-transform duration-300 cursor-default">
                   🍵
                 </span>
               </h1>
-              <p className="mt-3 text-gray-600 leading-relaxed max-w-2xl">
+              <p className="mt-2 text-sm sm:text-base text-gray-600 leading-relaxed max-w-2xl">
                 This is Isa's definitive matcha tier list! Isa has visited all these places and 
                 rated them based on their matcha quality and overall experience.
               </p>
             </div>
-            <div className="flex gap-4">
+            <div className="flex flex-wrap gap-2 sm:gap-4">
               <button
                 onClick={() => setShowPittsburghOnly(!showPittsburghOnly)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 shadow-sm hover:shadow-md ${
+                className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg transition-all duration-200 shadow-sm hover:shadow-md text-sm sm:text-base ${
                   showPittsburghOnly 
                     ? 'bg-black text-yellow-300 hover:bg-gray-800' 
                     : 'bg-yellow-300 text-black hover:bg-yellow-400'
@@ -460,29 +474,55 @@ const App = () => {
                 <img 
                   src={`${getBasePath()}/images/bridge.png`}
                   alt="Bridge icon" 
-                  className={`w-5 h-5 object-contain ${
+                  className={`w-4 sm:w-5 h-4 sm:h-5 object-contain ${
                     showPittsburghOnly ? 'brightness-0 invert' : 'brightness-100'
                   }`}
                 />
-                <span>{showPittsburghOnly ? 'Show All' : 'Pittsburgh Only'}</span>
+                <span className="hidden sm:inline">{showPittsburghOnly ? 'Show All' : 'Pittsburgh Only'}</span>
+                <span className="sm:hidden">PGH</span>
               </button>
               <button
                 onClick={() => setIsPhotoGridOpen(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-green-100 hover:bg-green-200 
-                  text-green-800 rounded-lg transition-colors duration-200 shadow-sm hover:shadow-md"
+                className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-green-100 hover:bg-green-200 
+                  text-green-800 rounded-lg transition-colors duration-200 shadow-sm hover:shadow-md text-sm sm:text-base"
               >
-                <Camera size={20} />
-                <span>View Gallery</span>
+                <Camera size={16} className="sm:hidden" />
+                <Camera size={20} className="hidden sm:block" />
+                <span className="hidden sm:inline">View Gallery</span>
+                <span className="sm:hidden">Photos</span>
               </button>
             </div>
           </div>
         </div>
       </header>
+
+      {/* Mobile View Switcher */}
+      <div className="sm:hidden sticky top-[72px] z-[999] bg-white/80 backdrop-blur-sm shadow-sm">
+        <div className="flex justify-center gap-2 p-2">
+          <button
+            onClick={() => setActiveView('list')}
+            className={`flex-1 max-w-[160px] flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-colors duration-200
+              ${activeView === 'list' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}
+          >
+            <ListFilter size={16} />
+            <span>List</span>
+          </button>
+          <button
+            onClick={() => setActiveView('map')}
+            className={`flex-1 max-w-[160px] flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-colors duration-200
+              ${activeView === 'map' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}
+          >
+            <Map size={16} />
+            <span>Map</span>
+          </button>
+        </div>
+      </div>
       
-      <main className="max-w-7xl mx-auto px-6 py-10">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-          <div className="z-[900]">
-            <h2 className="text-2xl font-bold mb-8 flex items-center gap-2">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-10">
+          {/* List View */}
+          <div className={`z-[900] ${activeView === 'list' ? 'block' : 'hidden sm:block'}`}>
+            <h2 className="text-xl sm:text-2xl font-bold mb-6 sm:mb-8 flex items-center gap-2">
               Tier List 
               <span className="text-gray-500 font-normal">({places.length} places)</span>
             </h2>
@@ -492,7 +532,8 @@ const App = () => {
             />
           </div>
           
-          <div className="space-y-10">
+          {/* Map and Details View */}
+          <div className={`space-y-6 sm:space-y-10 ${activeView === 'map' ? 'block' : 'hidden sm:block'}`}>
             <div className="relative z-[900] transition-all duration-300 ease-in-out"
                  style={{ 
                    opacity: isDetailsVisible ? 1 : 0,
@@ -506,11 +547,11 @@ const App = () => {
               )}
             </div>
             
-            <div className="h-[500px] rounded-xl overflow-hidden shadow-lg relative z-[800]
+            <div className="h-[400px] sm:h-[500px] rounded-xl overflow-hidden shadow-lg relative z-[800]
                           transform transition-all duration-500 hover:shadow-2xl">
               <MapContainer 
                 center={[40.443394552756146, -79.94169118980099]} 
-                zoom={13} 
+                zoom={12}
                 style={{ height: '100%', width: '100%' }}
                 ref={setMapRef}
               >
