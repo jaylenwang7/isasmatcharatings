@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, AttributionControl } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import { Camera, X, Map, ListFilter } from 'lucide-react';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
@@ -507,7 +507,36 @@ const App = () => {
                 rated them based on their matcha quality and overall experience.
               </p>
             </div>
-            {/* ... rest of header buttons */}
+            <div className="flex flex-wrap gap-2 sm:gap-4">
+              <button
+                onClick={() => setShowPittsburghOnly(!showPittsburghOnly)}
+                className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg transition-all duration-200 shadow-sm hover:shadow-md text-sm sm:text-base ${
+                  showPittsburghOnly 
+                    ? 'bg-black text-yellow-300 hover:bg-gray-800' 
+                    : 'bg-yellow-300 text-black hover:bg-yellow-400'
+                }`}
+              >
+                <img 
+                  src={`${getBasePath()}/images/bridge.png`}
+                  alt="Bridge icon" 
+                  className={`w-4 sm:w-5 h-4 sm:h-5 object-contain ${
+                    showPittsburghOnly ? 'brightness-0 invert' : 'brightness-100'
+                  }`}
+                />
+                <span className="hidden sm:inline">{showPittsburghOnly ? 'Show All' : 'Pittsburgh Only'}</span>
+                <span className="sm:hidden">{showPittsburghOnly ? 'Show All' : 'PGH'}</span>
+              </button>
+              <button
+                onClick={() => setIsPhotoGridOpen(true)}
+                className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-green-100 hover:bg-green-200 
+                  text-green-800 rounded-lg transition-colors duration-200 shadow-sm hover:shadow-md text-sm sm:text-base"
+              >
+                <Camera size={16} className="sm:hidden" />
+                <Camera size={20} className="hidden sm:block" />
+                <span className="hidden sm:inline">View Gallery</span>
+                <span className="sm:hidden">Photos</span>
+              </button>
+            </div>
           </div>
         </div>
       </header>
