@@ -208,8 +208,6 @@ const PhotoGrid = ({ places, onPlaceSelect, isOpen, onClose }) => {
   );
 };
 
-
-
 const TierList = ({ places, onPlaceSelect, setActiveView }) => {
   const [expandedTier, setExpandedTier] = useState(null);
   
@@ -368,8 +366,6 @@ const App = () => {
   const [showPittsburghOnly, setShowPittsburghOnly] = useState(false);
   const [allPlaces, setAllPlaces] = useState([]);
   const [activeView, setActiveView] = useState('list');
-  const [showViewHint, setShowViewHint] = useState(false);
-  const [hasScrolled, setHasScrolled] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -380,8 +376,8 @@ const App = () => {
       })
       .then(data => {
         if (!Array.isArray(data)) throw new Error('Data is not in the expected format');
-        setAllPlaces(data); // Store all places
-        setPlaces(data);    // Initial places display
+        setAllPlaces(data);
+        setPlaces(data);
         setError(null);
       })
       .catch(error => {
@@ -393,10 +389,8 @@ const App = () => {
       });
   }, []);
 
-  // Filter places when toggle changes
   useEffect(() => {
     if (showPittsburghOnly) {
-      // Define Pittsburgh's approximate boundaries
       const pghBounds = {
         minLat: 40.35,
         maxLat: 40.50,
@@ -412,7 +406,6 @@ const App = () => {
       );
       setPlaces(filteredPlaces);
       
-      // Recenter map on Pittsburgh
       if (mapRef) {
         mapRef.flyTo([40.4406, -79.9959], 12);
       }
@@ -421,34 +414,42 @@ const App = () => {
     }
   }, [showPittsburghOnly, allPlaces, mapRef]);
 
-  // Handle place selection with visual feedback
+  // Updated place selection handler with improved desktop animation
   const handlePlaceSelect = (place) => {
-    // First hide the current details if any
-    setIsDetailsVisible(false);
+    const isMobile = window.innerWidth < 640;
     
-    // If on mobile, switch to map view immediately
-    if (window.innerWidth < 640) {
+    if (isMobile) {
+      // On mobile, switch view immediately and show details after a short delay
       setActiveView('map');
-      setShowViewHint(true);
-      setTimeout(() => setShowViewHint(false), 3000);
+      setSelectedPlace(place);
+      
+      // Ensure map centers on location
+      if (mapRef) {
+        mapRef.flyTo([place.lat, place.lng], 15, {
+          duration: 1
+        });
+      }
+      
+      // Short delay before showing details on mobile
+      setTimeout(() => {
+        setIsDetailsVisible(true);
+      }, 300);
+    } else {
+      // On desktop, animate map first, then show details
+      setSelectedPlace(place);
+      
+      if (mapRef) {
+        // First zoom to location
+        mapRef.flyTo([place.lat, place.lng], 15, {
+          duration: 1.2
+        });
+        
+        // Show details after map animation
+        setTimeout(() => {
+          setIsDetailsVisible(true);
+        }, 1200);
+      }
     }
-    
-    // Set the selected place immediately to update map marker
-    setSelectedPlace(place);
-    
-    // Fly to the location
-    if (mapRef) {
-      mapRef.flyTo([place.lat, place.lng], 15, {
-        duration: 1.5,
-        easeLinearity: 0.25
-      });
-    }
-    
-    // Show the details after a delay (longer on desktop for map animation)
-    const delay = window.innerWidth < 640 ? 300 : 1000;
-    setTimeout(() => {
-      setIsDetailsVisible(true);
-    }, delay);
   };
 
   const handleCloseDetails = () => {
@@ -457,19 +458,6 @@ const App = () => {
       setSelectedPlace(null);
     }, 300);
   };
-
-  // Add scroll event listener
-  useEffect(() => {
-    const handleScroll = () => {
-      // Only track scroll on mobile
-      if (window.innerWidth < 640) {
-        setHasScrolled(window.scrollY > 50);
-      }
-    };
-
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
 
   if (loading) {
     return (
@@ -501,8 +489,7 @@ const App = () => {
                   🍵
                 </span>
               </h1>
-              <p className={`mt-2 text-sm sm:text-base text-gray-600 leading-relaxed max-w-2xl transition-all duration-300
-                ${hasScrolled ? 'sm:opacity-100 sm:h-auto h-0 opacity-0' : 'opacity-100 h-auto'}`}>
+              <p className="mt-2 text-sm sm:text-base text-gray-600 leading-relaxed max-w-2xl">
                 This is Isa's definitive matcha tier list! Isa has visited all these places and 
                 rated them based on their matcha quality and overall experience.
               </p>
@@ -545,7 +532,10 @@ const App = () => {
       <div className="sm:hidden sticky top-0 z-[999] bg-white/80 backdrop-blur-sm shadow-sm">
         <div className="flex justify-center gap-2 p-2">
           <button
-            onClick={() => setActiveView('list')}
+            onClick={() => {
+              setActiveView('list');
+              setIsDetailsVisible(false);
+            }}
             className={`flex-1 max-w-[160px] flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-colors duration-200
               ${activeView === 'list' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}
           >
@@ -555,17 +545,10 @@ const App = () => {
           <button
             onClick={() => setActiveView('map')}
             className={`flex-1 max-w-[160px] flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-colors duration-200
-              ${activeView === 'map' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}
-              ${showViewHint ? 'animate-pulse' : ''}`}
+              ${activeView === 'map' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}
           >
             <Map size={16} />
             <span>Map & Info</span>
-            {showViewHint && (
-              <span className="absolute -top-2 -right-2 flex h-4 w-4">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-4 w-4 bg-green-500"></span>
-              </span>
-            )}
           </button>
         </div>
       </div>
@@ -591,7 +574,9 @@ const App = () => {
                  style={{ 
                    opacity: isDetailsVisible ? 1 : 0,
                    transform: isDetailsVisible ? 'translateY(0)' : 'translateY(-20px)',
-                   pointerEvents: isDetailsVisible ? 'auto' : 'none'
+                   pointerEvents: isDetailsVisible ? 'auto' : 'none',
+                   height: isDetailsVisible ? 'auto' : '0px',
+                   overflow: 'hidden'
                  }}>
               {selectedPlace && (
                 <PlaceDetails 
