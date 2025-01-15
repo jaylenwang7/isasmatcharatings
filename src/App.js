@@ -200,13 +200,14 @@ const PhotoGrid = ({ places, onPlaceSelect, isOpen, onClose }) => {
 };
 
 
+
 const TierList = ({ places, onPlaceSelect }) => {
   const [expandedTier, setExpandedTier] = useState(null);
   
   return (
-    <div className="space-y-6">
+    <div className="space-y-3 sm:space-y-6">
       {Object.keys(TIERS).map(tier => (
-        <div key={tier} className="relative transform transition-all duration-200 hover:scale-[1.02]">
+        <div key={tier} className="relative transform transition-all duration-200 hover:scale-[1.01]">
           <div 
             className={`absolute -top-2 left-0 right-0 transform -translate-y-full 
               bg-white/95 backdrop-blur-sm p-4 rounded-lg shadow-lg z-10 transition-all duration-300
@@ -216,32 +217,35 @@ const TierList = ({ places, onPlaceSelect }) => {
           </div>
           
           <div 
-            className={`rounded-xl p-5 shadow-md hover:shadow-xl transition-shadow duration-300 
+            className={`rounded-lg sm:rounded-xl p-3 sm:p-5 shadow-md hover:shadow-xl transition-shadow duration-300 
               border-l-4 ${TIERS[tier].borderColor} bg-gradient-to-br from-white to-gray-50`}
             onClick={() => setExpandedTier(expandedTier === tier ? null : tier)}
             onMouseLeave={() => setExpandedTier(null)}
           >
-            <div className="flex items-center gap-6">
-              <div className={`w-16 h-16 flex-shrink-0 flex items-center justify-center text-3xl font-bold 
+            <div className="flex items-center gap-3 sm:gap-6">
+              <div className={`w-12 h-12 sm:w-16 sm:h-16 flex-shrink-0 flex items-center justify-center text-2xl sm:text-3xl font-bold 
                 bg-gradient-to-br ${TIERS[tier].gradientFrom} ${TIERS[tier].gradientTo} 
-                rounded-lg shadow-inner text-white transform transition-transform duration-200 
-                hover:scale-110`}>
+                rounded-lg shadow-inner text-white`}>
                 {tier}
               </div>
-              <div className="flex flex-wrap gap-3 flex-1">
+              <div className="flex flex-wrap gap-2 sm:gap-3 flex-1">
                 {places.filter(place => place.tier === tier).map(place => (
                   <div 
                     key={place.id}
-                    className={`relative group p-3 rounded-lg cursor-pointer w-full sm:w-[calc(50%-0.75rem)]
+                    className={`relative group p-2 sm:p-3 rounded-lg cursor-pointer w-full sm:w-[calc(50%-0.75rem)]
                       ${TIERS[tier].color} transform transition-all duration-200 
-                      hover:scale-105 hover:shadow-md`}
+                      hover:scale-102 hover:shadow-md active:scale-95`}
                     onClick={(e) => {
                       e.stopPropagation();
                       onPlaceSelect(place);
+                      // On mobile, switch to map view when place is selected
+                      if (window.innerWidth < 640) {
+                        setActiveView('map');
+                      }
                     }}
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 flex-shrink-0 rounded-full overflow-hidden shadow-inner">
+                    <div className="flex items-center gap-2 sm:gap-3">
+                      <div className="w-8 h-8 sm:w-10 sm:h-10 flex-shrink-0 rounded-full overflow-hidden shadow-inner">
                         <PlaceImage imagePath={place.imagePath} name={place.name} size="small" />
                       </div>
                       <div className="min-w-0 flex-1">
@@ -355,6 +359,7 @@ const App = () => {
   const [showPittsburghOnly, setShowPittsburghOnly] = useState(false);
   const [allPlaces, setAllPlaces] = useState([]);
   const [activeView, setActiveView] = useState('list');
+  const [showViewHint, setShowViewHint] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -406,10 +411,18 @@ const App = () => {
     }
   }, [showPittsburghOnly, allPlaces, mapRef]);
 
-  const handlePlaceSelect = (place) => {
+   // Handle place selection with visual feedback
+   const handlePlaceSelect = (place) => {
     setIsDetailsVisible(false);
+    setSelectedPlace(place);
+    
+    if (window.innerWidth < 640) {
+      setActiveView('map');
+      setShowViewHint(true);
+      setTimeout(() => setShowViewHint(false), 3000); // Hide hint after 3 seconds
+    }
+    
     setTimeout(() => {
-      setSelectedPlace(place);
       setIsDetailsVisible(true);
       if (mapRef) {
         mapRef.flyTo([place.lat, place.lng], 15, {
@@ -510,21 +523,28 @@ const App = () => {
           <button
             onClick={() => setActiveView('map')}
             className={`flex-1 max-w-[160px] flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-colors duration-200
-              ${activeView === 'map' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}
+              ${activeView === 'map' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}
+              ${showViewHint ? 'animate-pulse' : ''}`}
           >
             <Map size={16} />
             <span>Map</span>
+            {showViewHint && (
+              <span className="absolute -top-2 -right-2 flex h-4 w-4">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-4 w-4 bg-green-500"></span>
+              </span>
+            )}
           </button>
         </div>
       </div>
-      
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-10">
+
+      <main className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-10">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-10">
           {/* List View */}
           <div className={`z-[900] ${activeView === 'list' ? 'block' : 'hidden sm:block'}`}>
-            <h2 className="text-xl sm:text-2xl font-bold mb-6 sm:mb-8 flex items-center gap-2">
+            <h2 className="text-lg sm:text-2xl font-bold mb-4 sm:mb-8 flex items-center gap-2">
               Tier List 
-              <span className="text-gray-500 font-normal">({places.length} places)</span>
+              <span className="text-gray-500 font-normal text-base">({places.length} places)</span>
             </h2>
             <TierList 
               places={places} 
@@ -533,7 +553,7 @@ const App = () => {
           </div>
           
           {/* Map and Details View */}
-          <div className={`space-y-6 sm:space-y-10 ${activeView === 'map' ? 'block' : 'hidden sm:block'}`}>
+          <div className={`space-y-4 sm:space-y-10 ${activeView === 'map' ? 'block' : 'hidden sm:block'}`}>
             <div className="relative z-[900] transition-all duration-300 ease-in-out"
                  style={{ 
                    opacity: isDetailsVisible ? 1 : 0,
