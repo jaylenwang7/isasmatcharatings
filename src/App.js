@@ -1,8 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, AttributionControl } from 'react-leaflet';
 import { Camera, X, Map, ListFilter } from 'lucide-react';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+
+// Improve touch detection
+L.Browser.touch = true;
+L.Browser.mobile = true;
 
 // Fix for default marker icons in production
 delete L.Icon.Default.prototype._getIconUrl;
@@ -586,8 +590,31 @@ const App = () => {
                 zoom={12}
                 style={{ height: '100%', width: '100%' }}
                 ref={setMapRef}
+                preferCanvas={true}
+                updateWhenZooming={false}
+                updateWhenIdle={true}
+                zoomDelta={1}
+                zoomSnap={1}
+                bounceAtZoomLimits={false}
+                maxZoom={18}
+                minZoom={3}
+                attributionControl={false}
               >
-                <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                <TileLayer 
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  maxNativeZoom={18}
+                  maxZoom={18}
+                  tileSize={256}
+                  keepBuffer={2}
+                  updateWhenIdle={true}
+                  updateWhenZooming={false}
+                  errorTileUrl="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+                />
+                
+                {/* Add attribution control in a better position for mobile */}
+                <AttributionControl position="bottomright" prefix={false} />
+                
+                {/* Rest of the markers code remains the same */}
                 {places.map(place => (
                   <Marker 
                     key={place.id}
