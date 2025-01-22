@@ -247,6 +247,8 @@ def fetch_and_process_data():
             if not record['Place Name'].strip():
                 continue
 
+            print(f"\nProcessing row {idx + 2}: {record['Place Name']}")
+
             # Try to parse coordinates first
             latlong_coordinates = parse_coordinates(record['Lat/Long from Google Maps'])
 
@@ -256,10 +258,10 @@ def fetch_and_process_data():
 
             # Prefer address coordinates if available
             if address_coordinates:
-                print(f"Using geocoded coordinates for {record['Place Name']}")
+                print(f"Using geocoded coordinates for {record['Place Name']} ({record[address_column]}): {address_coordinates}")
                 coordinates = address_coordinates
             elif latlong_coordinates:
-                print(f"Using lat/long coordinates for {record['Place Name']}")
+                print(f"Using lat/long coordinates for {record['Place Name']}: {latlong_coordinates}")
                 coordinates = latlong_coordinates
             else:
                 coordinates = None
