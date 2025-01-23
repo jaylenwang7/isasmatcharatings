@@ -255,6 +255,8 @@ def fetch_and_process_data():
             # If address column, override coordinates with geocoding
             if address_column in record and record[address_column].strip():
                 address_coordinates = geocode_address(record[address_column], coordinates_cache)
+            else:
+                address_coordinates = None
 
             # Prefer address coordinates if available
             if address_coordinates:
