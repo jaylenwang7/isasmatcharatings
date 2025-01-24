@@ -366,6 +366,7 @@ const App = () => {
   const [showPittsburghOnly, setShowPittsburghOnly] = useState(false);
   const [allPlaces, setAllPlaces] = useState([]);
   const [activeView, setActiveView] = useState('list');
+  const [isMapReady, setIsMapReady] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -406,40 +407,41 @@ const App = () => {
       );
       setPlaces(filteredPlaces);
       
-      if (mapRef) {
+      if (mapRef && isMapReady) {
         mapRef.flyTo([40.4406, -79.9959], 12);
       }
     } else {
       setPlaces(allPlaces);
     }
-  }, [showPittsburghOnly, allPlaces, mapRef]);
+  }, [showPittsburghOnly, allPlaces, mapRef, isMapReady]);
 
   // Updated place selection handler with fixed mobile behavior
   const handlePlaceSelect = (place) => {
     const isMobile = window.innerWidth < 640;
     
-    // Always set the selected place first
-    setSelectedPlace(place);
-    
     if (isMobile) {
       // On mobile: First switch to map view
       setActiveView('map');
+      setSelectedPlace(place);
       
-      // Then center the map (if it exists)
-      if (mapRef) {
-        mapRef.flyTo([place.lat, place.lng], 15, {
-          duration: 1
-        });
+      // Ensure map is ready before attempting to fly to location
+      if (mapRef && isMapReady) {
+        // Add a small delay to allow for view transition
+        setTimeout(() => {
+          mapRef.flyTo([place.lat, place.lng], 15, {
+            duration: 1
+          });
+          
+          // Show details after map movement
+          setIsDetailsVisible(false);
+          setTimeout(() => {
+            setIsDetailsVisible(true);
+          }, 300);
+        }, 100);
       }
-      
-      // Show details after a short delay to allow for view transition
-      // Hide details first to ensure animation plays
-      setIsDetailsVisible(false);
-      setTimeout(() => {
-        setIsDetailsVisible(true);
-      }, 100);
     } else {
-      // On desktop: Animate map first, then show details
+      // Desktop behavior remains the same
+      setSelectedPlace(place);
       if (mapRef) {
         mapRef.flyTo([place.lat, place.lng], 15, {
           duration: 1.2
@@ -453,6 +455,11 @@ const App = () => {
     }
   };
 
+  const handleMapReady = (map) => {
+    setMapRef(map);
+    setIsMapReady(true);
+  };
+
   const handleCloseDetails = () => {
     setIsDetailsVisible(false);
     setTimeout(() => {
@@ -460,8 +467,9 @@ const App = () => {
     }, 300);
   };
 
-  // Add view change handler to manage transitions
   const handleViewChange = (view) => {
+    const isMobile = window.innerWidth < 640;
+    
     if (view === 'list') {
       setIsDetailsVisible(false);
       setTimeout(() => {
@@ -469,6 +477,15 @@ const App = () => {
       }, 300);
     } else {
       setActiveView(view);
+      // If switching to map view and there's a selected place, ensure it's visible
+      if (isMobile && selectedPlace && mapRef && isMapReady) {
+        setTimeout(() => {
+          mapRef.flyTo([selectedPlace.lat, selectedPlace.lng], 15, {
+            duration: 1
+          });
+          setIsDetailsVisible(true);
+        }, 100);
+      }
     }
   };
 
@@ -578,7 +595,7 @@ const App = () => {
             />
           </div>
           
-          {/* Map and Details View - Updated container structure */}
+          {/* Map and Details View */}
           <div className={`${activeView === 'map' ? 'block' : 'hidden lg:block'}`}>
             <div className="flex flex-col gap-4 sm:gap-10">
               {/* Details Section */}
@@ -599,7 +616,7 @@ const App = () => {
                   center={[40.443394552756146, -79.94169118980099]} 
                   zoom={12}
                   style={{ height: '100%', width: '100%' }}
-                  ref={setMapRef}
+                  ref={handleMapReady}
                   preferCanvas={true}
                   updateWhenZooming={false}
                   updateWhenIdle={true}
