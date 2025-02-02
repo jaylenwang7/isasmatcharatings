@@ -424,33 +424,24 @@ const App = () => {
       setActiveView('map');
       setSelectedPlace(place);
       
-      // Ensure map is ready before attempting to fly to location
-      if (mapRef && isMapReady) {
-        // Add a small delay to allow for view transition
-        setTimeout(() => {
-          mapRef.flyTo([place.lat, place.lng], 15, {
-            duration: 1
-          });
-          
-          // Show details after map movement
-          setIsDetailsVisible(false);
-          setTimeout(() => {
-            setIsDetailsVisible(true);
-          }, 300);
-        }, 100);
-      }
+      const attemptFly = () => {
+        if (mapRef && isMapReady) {
+          mapRef.invalidateSize(true);
+          mapRef.flyTo([place.lat, place.lng], 15, { duration: 1 });
+          setIsDetailsVisible(true);
+        } else {
+          setTimeout(attemptFly, 50);
+        }
+      };
+      
+      setTimeout(attemptFly, 100);
     } else {
-      // Desktop behavior remains the same
+      // Desktop behavior remains unchanged
       setSelectedPlace(place);
       if (mapRef) {
-        mapRef.flyTo([place.lat, place.lng], 15, {
-          duration: 1.2
-        });
-        
+        mapRef.flyTo([place.lat, place.lng], 15, { duration: 1.2 });
         setIsDetailsVisible(false);
-        setTimeout(() => {
-          setIsDetailsVisible(true);
-        }, 1200);
+        setTimeout(() => setIsDetailsVisible(true), 1200);
       }
     }
   };
@@ -477,6 +468,12 @@ const App = () => {
       }, 300);
     } else {
       setActiveView(view);
+      // Force map resize when switching to map view
+      if (mapRef) {
+        setTimeout(() => {
+          mapRef.invalidateSize(true);
+        }, 50);
+      }
       // If switching to map view and there's a selected place, ensure it's visible
       if (isMobile && selectedPlace && mapRef && isMapReady) {
         setTimeout(() => {
@@ -616,7 +613,14 @@ const App = () => {
                   center={[40.443394552756146, -79.94169118980099]} 
                   zoom={12}
                   style={{ height: '100%', width: '100%' }}
-                  ref={handleMapReady}
+                  ref={(map) => {
+                    if (map) {
+                      handleMapReady(map);
+                      map.on('load', () => setIsMapReady(true));
+                      // Check if already loaded (e.g., when created visible)
+                      if (map._loaded) setIsMapReady(true);
+                    }
+                  }}
                   preferCanvas={true}
                   updateWhenZooming={false}
                   updateWhenIdle={true}
