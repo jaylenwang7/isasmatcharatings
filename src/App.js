@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import { Camera, X, Map, ListFilter } from 'lucide-react';
 import 'leaflet/dist/leaflet.css';
