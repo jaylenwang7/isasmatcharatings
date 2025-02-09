@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import { Camera, X, Map, ListFilter } from 'lucide-react';
 import 'leaflet/dist/leaflet.css';
@@ -208,7 +208,7 @@ const PhotoGrid = ({ places, onPlaceSelect, isOpen, onClose }) => {
   );
 };
 
-const TierList = ({ places, onPlaceSelect, setActiveView }) => {
+const TierList = ({ places, onPlaceSelect, setActiveView, countriesCount, usStatesCount }) => {
   const [expandedTier, setExpandedTier] = useState(null);
   
   return (
@@ -486,6 +486,15 @@ const App = () => {
     }
   };
 
+  const countUnique = (arr) => [...new Set(arr.filter(Boolean))].length;
+
+  const countryCount = countUnique(places.map(p => p.country));
+  const usStateCount = countUnique(
+    places
+      .filter(p => p.country === 'USA')
+      .map(p => p.state)
+  );
+
   if (loading) {
     return (
       <div className="min-h-screen bg-green-50 flex items-center justify-center">
@@ -583,12 +592,16 @@ const App = () => {
           <div className={`z-[900] ${activeView === 'list' ? 'block' : 'hidden lg:block'}`}>
             <h2 className="text-lg sm:text-2xl font-bold mb-4 sm:mb-8 flex items-center gap-2">
               Tier List 
-              <span className="text-gray-500 font-normal text-base">({places.length} places)</span>
+              <span className="text-gray-500 font-normal text-base">
+                ({places.length} places · {countryCount} countries · {usStateCount} US states)
+              </span>
             </h2>
             <TierList 
               places={places} 
               onPlaceSelect={handlePlaceSelect}
               setActiveView={setActiveView}
+              countriesCount={countryCount}
+              usStatesCount={usStateCount}
             />
           </div>
           

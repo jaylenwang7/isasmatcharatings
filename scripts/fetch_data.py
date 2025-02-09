@@ -207,6 +207,28 @@ def save_coordinates_cache(cache: Dict):
     with cache_path.open('w', encoding='utf-8') as f:
         json.dump(cache, f, indent=2, ensure_ascii=False)
 
+def process_geo_data(address: str) -> Tuple[Optional[str], Optional[str]]:
+    """Extract country and state from address string"""
+    if not address:
+        return None, None
+    
+    parts = [p.strip() for p in address.split(',')]
+    country = parts[-1] if len(parts) >= 1 else None
+    state = parts[-2] if len(parts) >= 2 else None
+    
+    # Clean up country names
+    if country and country.lower() in ['usa', 'united states']:
+        country = 'USA'
+        # Only consider state if in USA
+        if state and len(state) == 2:
+            state = state.upper()
+        else:
+            state = None
+    else:
+        state = None  # Only track US states
+    
+    return country, state
+
 def fetch_and_process_data():
     """
     Fetch data from Google Sheets and process coordinates and images
@@ -292,6 +314,8 @@ def fetch_and_process_data():
                 else:
                     print(f"Could not extract valid file ID from URL for {record['Place Name']}: {image_url}")
             
+            country, state = process_geo_data(record[address_column])
+            
             processed_place = {
                 'id': idx,
                 'name': record['Place Name'].strip(),
@@ -301,7 +325,9 @@ def fetch_and_process_data():
                 'imagePath': image_path,  # This will be None if no image or download failed
                 'lat': lat,
                 'lng': lng,
-                'lastUpdated': pd.Timestamp.now().isoformat()
+                'lastUpdated': pd.Timestamp.now().isoformat(),
+                'country': country,
+                'state': state
             }
             
             # Add address if available
