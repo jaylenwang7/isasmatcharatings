@@ -593,7 +593,7 @@ const App = () => {
             <h2 className="text-lg sm:text-2xl font-bold mb-4 sm:mb-8 flex items-center gap-2">
               Tier List 
               <span className="text-gray-500 font-normal text-base">
-                ({places.length} places · {countryCount} countries · {usStateCount} US states)
+                ({places.length} places)
               </span>
             </h2>
             <TierList 

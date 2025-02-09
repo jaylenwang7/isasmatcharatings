@@ -209,24 +209,48 @@ def save_coordinates_cache(cache: Dict):
 
 def process_geo_data(address: str) -> Tuple[Optional[str], Optional[str]]:
     """Extract country and state from address string"""
+    print(f"\nProcessing address: {address}")
     if not address:
+        print("No address provided")
         return None, None
     
     parts = [p.strip() for p in address.split(',')]
-    country = parts[-1] if len(parts) >= 1 else None
-    state = parts[-2] if len(parts) >= 2 else None
+    print(f"Address parts: {parts}")
     
-    # Clean up country names
-    if country and country.lower() in ['usa', 'united states']:
+    if len(parts) < 2:  # Need at least city, state
+        print("Not enough parts in address")
+        return None, None
+        
+    # Get the last part as country, if not specified assume USA
+    country = parts[-1].strip()
+    print(f"Last part: {country}")
+    
+    if country.lower() in ['usa', 'united states', 'us']:
         country = 'USA'
-        # Only consider state if in USA
-        if state and len(state) == 2:
-            state = state.upper()
-        else:
-            state = None
-    else:
-        state = None  # Only track US states
+        print("Normalized country name to USA")
+    elif len(parts[-1].strip()) == 2:  # If last part is state code, assume USA
+        country = 'USA'
+        print("Found state code as last part, assuming USA")
     
+    # Get state from second to last part if in USA
+    state = None
+    if country == 'USA' and len(parts) >= 2:
+        state_part = parts[-2].strip()
+        print(f"Checking state part: {state_part}")
+        # Check if it's a two-letter state code
+        if len(state_part) == 2:
+            state = state_part.upper()
+            print(f"Found two-letter state code: {state}")
+        else:
+            # Try to extract state code from longer state name (e.g., "Florida" -> "FL")
+            state_match = re.search(r'\b([A-Z]{2})\b', state_part.upper())
+            if state_match:
+                state = state_match.group(1)
+                print(f"Extracted state code from longer name: {state}")
+            else:
+                print(f"Could not extract state code from: {state_part}")
+    
+    print(f"Final result - Country: {country}, State: {state}")
     return country, state
 
 def fetch_and_process_data():
@@ -269,7 +293,7 @@ def fetch_and_process_data():
             if not record['Place Name'].strip():
                 continue
 
-            print(f"\nProcessing row {idx + 2}: {record['Place Name']}")
+            print(f"\nProcessing row {idx + 1}: {record['Place Name']}")
 
             # Try to parse coordinates first
             latlong_coordinates = parse_coordinates(record['Lat/Long from Google Maps'])
