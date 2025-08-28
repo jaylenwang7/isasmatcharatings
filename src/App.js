@@ -57,7 +57,8 @@ const TIERS = {
     gradientFrom: 'from-purple-500',
     gradientTo: 'to-purple-300',
     description: 'This matcha is good af - the best of the best, would go out of my way for it',
-    markerColor: '#9333ea' // Purple
+    markerColor: '#9333ea', // Purple
+    plusBg: 'bg-purple-500'
   },
   A: {
     color: 'bg-green-100 hover:bg-green-200',
@@ -66,7 +67,8 @@ const TIERS = {
     gradientFrom: 'from-green-500',
     gradientTo: 'to-green-300',
     description: 'Would be happy to have this matcha any day of the week',
-    markerColor: '#22c55e' // Green
+    markerColor: '#22c55e', // Green
+    plusBg: 'bg-green-500'
   },
   B: {
     color: 'bg-blue-100 hover:bg-blue-200',
@@ -75,7 +77,8 @@ const TIERS = {
     gradientFrom: 'from-blue-500',
     gradientTo: 'to-blue-300',
     description: 'Solid choice, would be happy to get this at a cafe',
-    markerColor: '#3b82f6' // Blue
+    markerColor: '#3b82f6', // Blue
+    plusBg: 'bg-blue-500'
   },
   C: {
     color: 'bg-yellow-100 hover:bg-yellow-200',
@@ -84,7 +87,8 @@ const TIERS = {
     gradientFrom: 'from-yellow-500',
     gradientTo: 'to-yellow-300',
     description: 'Decent matcha when you need to order something at a cafe',
-    markerColor: '#eab308' // Yellow
+    markerColor: '#eab308', // Yellow
+    plusBg: 'bg-yellow-500'
   },
   D: {
     color: 'bg-orange-100 hover:bg-orange-200',
@@ -93,7 +97,8 @@ const TIERS = {
     gradientFrom: 'from-orange-500',
     gradientTo: 'to-orange-300',
     description: 'Bruh, lackluster, would not recommend',
-    markerColor: '#f97316' // Orange
+    markerColor: '#f97316', // Orange
+    plusBg: 'bg-orange-500'
   },
   F: {
     color: 'bg-red-100 hover:bg-red-200',
@@ -102,7 +107,8 @@ const TIERS = {
     gradientFrom: 'from-red-500',
     gradientTo: 'to-red-300',
     description: 'Would avoid and maybe not even finish',
-    markerColor: '#ef4444' // Red
+    markerColor: '#ef4444', // Red
+    plusBg: 'bg-red-500'
   }
 };
 
@@ -268,7 +274,7 @@ const TierList = ({ places, onPlaceSelect, setActiveView, countriesCount, usStat
                         }}
                       >
                         {isPlus && (
-                          <div className={`absolute -top-2 -right-2 ${TIERS[tier].gradientFrom.replace('from-', 'bg-')} text-white rounded-full w-5 h-5 flex items-center justify-center shadow-lg z-10`}>
+                          <div className={`absolute -top-2 -right-2 ${TIERS[tier].plusBg} text-white rounded-full w-5 h-5 flex items-center justify-center shadow-lg z-10`}>
                             <Plus size={14} strokeWidth={3} />
                           </div>
                         )}
