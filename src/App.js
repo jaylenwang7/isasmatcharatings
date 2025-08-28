@@ -257,7 +257,7 @@ const TierList = ({ places, onPlaceSelect, setActiveView, countriesCount, usStat
                         className={`relative group p-2 sm:p-3 rounded-lg cursor-pointer w-full sm:w-[calc(50%-0.75rem)]
                           ${TIERS[tier].color} transform transition-all duration-200 
                           hover:scale-102 hover:shadow-md active:scale-95
-                          ${isPlus ? 'border-2 border-amber-400 shadow-lg' : ''}`}
+                          ${isPlus ? `border-2 ${TIERS[tier].borderColor} shadow-lg` : ''}`}
                         onClick={(e) => {
                           e.stopPropagation();
                           onPlaceSelect(place);
@@ -268,7 +268,7 @@ const TierList = ({ places, onPlaceSelect, setActiveView, countriesCount, usStat
                         }}
                       >
                         {isPlus && (
-                          <div className="absolute -top-2 -right-2 bg-amber-400 text-black rounded-full w-5 h-5 flex items-center justify-center shadow-lg z-10">
+                          <div className={`absolute -top-2 -right-2 ${TIERS[tier].gradientFrom.replace('from-', 'bg-')} text-white rounded-full w-5 h-5 flex items-center justify-center shadow-lg z-10`}>
                             <Plus size={14} strokeWidth={3} />
                           </div>
                         )}
@@ -302,7 +302,9 @@ const PlaceDetails = ({ place, onClose }) => {
   
   if (!place) return null;
   
-  const tierStyle = TIERS[getBaseTier(place.tier)];
+  const isPlus = isPlusTier(place.tier);
+  const baseTier = getBaseTier(place.tier);
+  const tierStyle = TIERS[baseTier];
   
   return (
     <div className="bg-white rounded-xl p-6 shadow-lg relative transform transition-all duration-500 
@@ -357,7 +359,8 @@ const PlaceDetails = ({ place, onClose }) => {
             )}
           </div>
           <div className={`px-4 py-2 rounded-full ${tierStyle.color} ${tierStyle.textColor} 
-            font-medium transform transition-transform duration-200 hover:scale-105`}>
+            font-medium transform transition-transform duration-200 hover:scale-105
+            ${isPlus ? `border-2 ${tierStyle.borderColor}` : ''}`}>
             Tier {place.tier}
           </div>
         </div>
