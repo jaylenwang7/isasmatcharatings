@@ -1,8 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
-import { Camera, X, Map, ListFilter } from 'lucide-react';
+import { Camera, X, Map, ListFilter, Plus } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+
+// Helper functions for tier parsing
+const getBaseTier = (tier) => tier ? tier.replace('+', '') : '';
+const isPlusTier = (tier) => tier ? tier.endsWith('+') : false;
 
 // Improve touch detection
 L.Browser.touch = true;
@@ -175,7 +181,7 @@ const PhotoGrid = ({ places, onPlaceSelect, isOpen, onClose }) => {
               className="group relative bg-white rounded-xl overflow-hidden shadow-lg 
                 transform transition-all duration-300 hover:scale-105 cursor-pointer"
               style={{
-                boxShadow: `0 0 0 4px ${getTierColor(place.tier)}`
+                boxShadow: `0 0 0 4px ${getTierColor(getBaseTier(place.tier))}`
               }}
               onClick={() => {
                 onPlaceSelect(place);
@@ -194,7 +200,7 @@ const PhotoGrid = ({ places, onPlaceSelect, isOpen, onClose }) => {
                   <h3 className="font-semibold text-base sm:text-lg">{place.name}</h3>
                   <div className="flex items-center gap-2 mt-1">
                     <span className={`px-2 py-1 rounded-full text-xs sm:text-sm 
-                      ${TIERS[place.tier].color} ${TIERS[place.tier].textColor}`}>
+                      ${TIERS[getBaseTier(place.tier)].color} ${TIERS[getBaseTier(place.tier)].textColor}`}>
                       Tier {place.tier}
                     </span>
                   </div>
@@ -236,36 +242,52 @@ const TierList = ({ places, onPlaceSelect, setActiveView, countriesCount, usStat
                 {tier}
               </div>
               <div className="flex flex-wrap gap-2 sm:gap-3 flex-1 min-w-0">
-                {places.filter(place => place.tier === tier).map(place => (
-                  <div 
-                    key={place.id}
-                    className={`relative group p-2 sm:p-3 rounded-lg cursor-pointer w-full sm:w-[calc(50%-0.75rem)]
-                      ${TIERS[tier].color} transform transition-all duration-200 
-                      hover:scale-102 hover:shadow-md active:scale-95`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onPlaceSelect(place);
-                      // On mobile, switch to map view when place is selected
-                      if (window.innerWidth < 640) {
-                        setActiveView('map');
-                      }
-                    }}
-                  >
-                    <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                      <div className="w-8 h-8 sm:w-10 sm:h-10 flex-shrink-0 rounded-full overflow-hidden shadow-inner">
-                        <PlaceImage imagePath={place.imagePath} name={place.name} size="small" />
-                      </div>
-                      <div className="min-w-0 flex-1 overflow-hidden">
-                        <span className="font-medium text-sm block truncate">{place.name}</span>
-                        {place.address && (
-                          <span className="text-xs text-gray-600 block truncate">
-                            {place.address}
-                          </span>
+                {places.filter(place => getBaseTier(place.tier) === tier)
+                  .sort((a, b) => {
+                    const aIsPlus = isPlusTier(a.tier);
+                    const bIsPlus = isPlusTier(b.tier);
+                    if (aIsPlus === bIsPlus) return a.name.localeCompare(b.name);
+                    return aIsPlus ? -1 : 1;
+                  })
+                  .map(place => {
+                    const isPlus = isPlusTier(place.tier);
+                    return (
+                      <div 
+                        key={place.id}
+                        className={`relative group p-2 sm:p-3 rounded-lg cursor-pointer w-full sm:w-[calc(50%-0.75rem)]
+                          ${TIERS[tier].color} transform transition-all duration-200 
+                          hover:scale-102 hover:shadow-md active:scale-95
+                          ${isPlus ? 'border-2 border-amber-400 shadow-lg' : ''}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onPlaceSelect(place);
+                          // On mobile, switch to map view when place is selected
+                          if (window.innerWidth < 640) {
+                            setActiveView('map');
+                          }
+                        }}
+                      >
+                        {isPlus && (
+                          <div className="absolute -top-2 -right-2 bg-amber-400 text-black rounded-full w-5 h-5 flex items-center justify-center shadow-lg z-10">
+                            <Plus size={14} strokeWidth={3} />
+                          </div>
                         )}
+                        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                          <div className="w-8 h-8 sm:w-10 sm:h-10 flex-shrink-0 rounded-full overflow-hidden shadow-inner">
+                            <PlaceImage imagePath={place.imagePath} name={place.name} size="small" />
+                          </div>
+                          <div className="min-w-0 flex-1 overflow-hidden">
+                            <span className="font-medium text-sm block truncate">{place.name}</span>
+                            {place.address && (
+                              <span className="text-xs text-gray-600 block truncate">
+                                {place.address}
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                ))}
+                    )
+                })}
               </div>
             </div>
           </div>
@@ -280,7 +302,7 @@ const PlaceDetails = ({ place, onClose }) => {
   
   if (!place) return null;
   
-  const tierStyle = TIERS[place.tier];
+  const tierStyle = TIERS[getBaseTier(place.tier)];
   
   return (
     <div className="bg-white rounded-xl p-6 shadow-lg relative transform transition-all duration-500 
@@ -347,7 +369,11 @@ const PlaceDetails = ({ place, onClose }) => {
           </div>
           <div>
             <h3 className="text-lg font-semibold text-gray-800">Notes</h3>
-            <p className="text-gray-700 leading-relaxed mt-1">{place.notes}</p>
+            <div className="text-gray-700 leading-relaxed mt-1 prose">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {place.notes}
+              </ReactMarkdown>
+            </div>
           </div>
         </div>
       </div>
@@ -650,8 +676,8 @@ const App = () => {
                       key={place.id}
                       position={[place.lat, place.lng]}
                       icon={selectedPlace && selectedPlace.id === place.id 
-                        ? TIER_ICONS[place.tier].selected 
-                        : TIER_ICONS[place.tier].default}
+                        ? TIER_ICONS[getBaseTier(place.tier)].selected 
+                        : TIER_ICONS[getBaseTier(place.tier)].default}
                       eventHandlers={{
                         click: () => handlePlaceSelect(place),
                       }}

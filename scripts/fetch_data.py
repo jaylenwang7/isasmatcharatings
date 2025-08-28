@@ -340,10 +340,14 @@ def fetch_and_process_data():
             
             country, state = process_geo_data(record[address_column])
             
+            tier_rating = record['Tier Rating'].strip().upper()
+            if '+' in record.get('Add a plus (e.g., B+)', ''):
+                tier_rating += '+'
+
             processed_place = {
                 'id': idx,
                 'name': record['Place Name'].strip(),
-                'tier': record['Tier Rating'].strip().upper(),
+                'tier': tier_rating,
                 'ordered': record['What did you order?'].strip(),
                 'notes': record['Notes'].strip(),
                 'imagePath': image_path,  # This will be None if no image or download failed
