@@ -1,19 +1,35 @@
 import re
-import pandas as pd
-from typing import Tuple, Dict, Optional
+from typing import List, Tuple, Dict, Optional
 import gspread
-from oauth2client.service_account import ServiceAccountCredentials
-from google.oauth2.credentials import Credentials
+from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
+from PIL import Image, ImageOps
 import io
 import os
 import json
+import shutil
 from pathlib import Path
 import hashlib
 from datetime import datetime
 import requests
 import time
+
+# Persisted between CI runs by actions/cache, so each build only fetches what's new
+CACHE_DIR = Path('.cache')
+IMAGE_CACHE_DIR = CACHE_DIR / 'images'
+COORDINATES_CACHE_PATH = CACHE_DIR / 'coordinates.json'
+
+# Longest edge of published photos; enough for the largest (600px tall) view on 2x screens
+MAX_IMAGE_SIZE = 1600
+
+VALID_TIERS = {'S', 'A', 'B', 'C', 'D', 'F'}
+
+def get_field(record: Dict, column: str) -> str:
+    """
+    Read a sheet cell as a stripped string (gspread returns numbers for numeric-looking cells)
+    """
+    return str(record.get(column, '')).strip()
 
 def get_safe_filename(name: str, file_id: str) -> str:
     """
@@ -21,10 +37,9 @@ def get_safe_filename(name: str, file_id: str) -> str:
     """
     # Clean the name to be filesystem-safe
     safe_name = re.sub(r'[^a-zA-Z0-9]', '-', name.lower())
-    # Add timestamp and partial hash for uniqueness
-    timestamp = datetime.now().strftime('%Y%m%d')
+    # Partial hash for uniqueness; no date, so the name stays stable and browsers can cache it
     file_hash = hashlib.md5(file_id.encode()).hexdigest()[:6]
-    return f"{safe_name}-{timestamp}-{file_hash}.jpg"
+    return f"{safe_name}-{file_hash}.jpg"
 
 def extract_file_id(url: str) -> Optional[str]:
     """
@@ -55,15 +70,25 @@ def extract_file_id(url: str) -> Optional[str]:
     
     return None
 
+def resize_image(source, dest: Path):
+    """
+    Shrink a full-size phone photo to a web-friendly JPEG
+    """
+    with Image.open(source) as img:
+        # Phone photos store their rotation in EXIF, which re-encoding drops, so apply it first
+        img = ImageOps.exif_transpose(img)
+        img.thumbnail((MAX_IMAGE_SIZE, MAX_IMAGE_SIZE))
+        img.convert('RGB').save(dest, 'JPEG', quality=82, optimize=True, progressive=True)
+
 def download_and_save_image(service, file_id: str, place_name: str) -> Optional[str]:
     """
-    Download image from Google Drive and save it to the repository
+    Download image from Google Drive, resize it, and save it to the repository
     Returns the path where the image was saved, or None if download fails
     """
     if not file_id or file_id.strip() == '':
         print(f"No image ID provided for {place_name}")
         return None
-        
+
     try:
         # Create images directory if it doesn't exist
         images_dir = Path('public/images')
@@ -73,22 +98,27 @@ def download_and_save_image(service, file_id: str, place_name: str) -> Optional[
         filename = get_safe_filename(place_name, file_id)
         file_path = images_dir / filename
 
-        # Download file
-        request = service.files().get_media(fileId=file_id)
-        fh = io.BytesIO()
-        downloader = MediaIoBaseDownload(fh, request)
-        
-        done = False
-        while not done:
-            status, done = downloader.next_chunk()
-            if status:
-                print(f"Downloading {filename}: {int(status.progress() * 100)}%")
+        # Reuse the resized image from an earlier build if we have it (the size is in the
+        # name so changing MAX_IMAGE_SIZE doesn't reuse stale images)
+        cached_path = IMAGE_CACHE_DIR / f"{file_id}-{MAX_IMAGE_SIZE}.jpg"
+        if cached_path.exists():
+            print(f"Using cached image for {place_name}")
+        else:
+            request = service.files().get_media(fileId=file_id)
+            fh = io.BytesIO()
+            downloader = MediaIoBaseDownload(fh, request)
 
-        # Save file
-        fh.seek(0)
-        with open(file_path, 'wb') as f:
-            f.write(fh.read())
+            done = False
+            while not done:
+                status, done = downloader.next_chunk()
+                if status:
+                    print(f"Downloading {filename}: {int(status.progress() * 100)}%")
 
+            fh.seek(0)
+            IMAGE_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+            resize_image(fh, cached_path)
+
+        shutil.copyfile(cached_path, file_path)
         return f"images/{filename}"
 
     except Exception as e:
@@ -149,6 +179,17 @@ def parse_coordinates(coord_string: str) -> Optional[Tuple[float, float]]:
     
     return None
 
+def strip_unit(address: str) -> str:
+    """
+    Remove suite/unit/floor parts (e.g. "Suite 103", "#2") that Nominatim often can't match
+    """
+    return re.sub(
+        r'\s*,?\s*(\b(suite|unit|apt|floor)\b\.?\s*#?|#)\s*[\w-]+',
+        '',
+        address,
+        flags=re.IGNORECASE
+    )
+
 def geocode_address(address: str, cache: Dict) -> Optional[Tuple[float, float]]:
     """
     Geocode an address using Nominatim, with caching
@@ -156,40 +197,46 @@ def geocode_address(address: str, cache: Dict) -> Optional[Tuple[float, float]]:
     print(f"Geocoding address: {address}")
     if address in cache:
         return cache[address]['lat'], cache[address]['lng']
-    
-    try:
-        # Respect Nominatim's usage policy with a 1-second delay
-        time.sleep(1.2)
-        
-        response = requests.get(
-            'https://nominatim.openstreetmap.org/search',
-            params={
-                'q': address,
-                'format': 'json',
-                'limit': 1
-            },
-            headers={'User-Agent': 'IsasMatchaTierList/1.0'}
-        )
-        response.raise_for_status()
-        data = response.json()
-        
-        if data:
-            lat = float(data[0]['lat'])
-            lng = float(data[0]['lon'])
-            cache[address] = {'lat': lat, 'lng': lng}
-            return lat, lng
-        else:
-            print(f"No results found for address: {address}")
-    except Exception as e:
-        print(f"Geocoding error for {address}: {str(e)}")
-    
+
+    # If the full address finds nothing, retry without the suite/unit
+    queries = [address]
+    if strip_unit(address) != address:
+        queries.append(strip_unit(address))
+
+    for query in queries:
+        try:
+            # Respect Nominatim's usage policy with a 1-second delay
+            time.sleep(1.2)
+
+            response = requests.get(
+                'https://nominatim.openstreetmap.org/search',
+                params={
+                    'q': query,
+                    'format': 'json',
+                    'limit': 1
+                },
+                headers={'User-Agent': 'IsasMatchaTierList/1.0'}
+            )
+            response.raise_for_status()
+            data = response.json()
+
+            if data:
+                lat = float(data[0]['lat'])
+                lng = float(data[0]['lon'])
+                cache[address] = {'lat': lat, 'lng': lng}
+                return lat, lng
+            else:
+                print(f"No results found for address: {query}")
+        except Exception as e:
+            print(f"Geocoding error for {query}: {str(e)}")
+
     return None
 
 def load_coordinates_cache() -> Dict:
     """
     Load the coordinates cache from file
     """
-    cache_path = Path('public/data/coordinates-cache.json')
+    cache_path = COORDINATES_CACHE_PATH
     if cache_path.exists():
         try:
             with cache_path.open('r', encoding='utf-8') as f:
@@ -202,7 +249,7 @@ def save_coordinates_cache(cache: Dict):
     """
     Save the coordinates cache to file
     """
-    cache_path = Path('public/data/coordinates-cache.json')
+    cache_path = COORDINATES_CACHE_PATH
     cache_path.parent.mkdir(parents=True, exist_ok=True)
     with cache_path.open('w', encoding='utf-8') as f:
         json.dump(cache, f, indent=2, ensure_ascii=False)
@@ -253,6 +300,19 @@ def process_geo_data(address: str) -> Tuple[Optional[str], Optional[str]]:
     print(f"Final result - Country: {country}, State: {state}")
     return country, state
 
+def report_skipped_rows(errors: List[str]):
+    """
+    Surface skipped rows in the GitHub Actions UI, so they aren't buried in the log
+    """
+    for error in errors:
+        print(f"::warning title=Skipped a review::{error}")
+
+    summary_path = os.getenv('GITHUB_STEP_SUMMARY')
+    if summary_path:
+        with open(summary_path, 'a', encoding='utf-8') as f:
+            f.write("### Reviews skipped (not on the site)\n\n")
+            f.write(''.join(f"- {error}\n" for error in errors))
+
 def fetch_and_process_data():
     """
     Fetch data from Google Sheets and process coordinates and images
@@ -261,13 +321,13 @@ def fetch_and_process_data():
     coordinates_cache = load_coordinates_cache()
     
     # Set up Google Sheets and Drive authentication
-    scope = [
-        'https://spreadsheets.google.com/feeds',
+    scopes = [
+        'https://www.googleapis.com/auth/spreadsheets.readonly',
         'https://www.googleapis.com/auth/drive.readonly'
     ]
-    
-    credentials = ServiceAccountCredentials.from_json_keyfile_name(
-        'credentials.json', scope)
+
+    credentials = Credentials.from_service_account_file(
+        'credentials.json', scopes=scopes)
     
     # Initialize Google Sheets client
     sheets_client = gspread.authorize(credentials)
@@ -288,28 +348,30 @@ def fetch_and_process_data():
     address_column = 'Address (copied from Google Maps)'
     
     for idx, record in enumerate(records):
+        place_name = get_field(record, 'Place Name')
+        address = get_field(record, address_column)
         try:
             # Skip empty rows
-            if not record['Place Name'].strip():
+            if not place_name:
                 continue
 
-            print(f"\nProcessing row {idx + 1}: {record['Place Name']}")
+            print(f"\nProcessing row {idx + 2}: {place_name}")
 
             # Try to parse coordinates first
-            latlong_coordinates = parse_coordinates(record['Lat/Long from Google Maps'])
+            latlong_coordinates = parse_coordinates(get_field(record, 'Lat/Long from Google Maps'))
 
             # If address column, override coordinates with geocoding
-            if address_column in record and record[address_column].strip():
-                address_coordinates = geocode_address(record[address_column], coordinates_cache)
+            if address:
+                address_coordinates = geocode_address(address, coordinates_cache)
             else:
                 address_coordinates = None
 
             # Prefer address coordinates if available
             if address_coordinates:
-                print(f"Using geocoded coordinates for {record['Place Name']} ({record[address_column]}): {address_coordinates}")
+                print(f"Using geocoded coordinates for {place_name} ({address}): {address_coordinates}")
                 coordinates = address_coordinates
             elif latlong_coordinates:
-                print(f"Using lat/long coordinates for {record['Place Name']}: {latlong_coordinates}")
+                print(f"Using lat/long coordinates for {place_name}: {latlong_coordinates}")
                 coordinates = latlong_coordinates
             else:
                 coordinates = None
@@ -317,68 +379,75 @@ def fetch_and_process_data():
             # If we still don't have coordinates, log an error and skip
             if not coordinates:
                 raise ValueError("Could not determine coordinates from input")
-                
+
             lat, lng = coordinates
-            
+
+            # The site crashes on an unknown tier, so reject it here. Accept "A+" in the tier
+            # column as well as a separate plus column
+            tier_rating = get_field(record, 'Tier Rating').upper()
+            is_plus = tier_rating.endswith('+') or '+' in get_field(record, 'Add a plus (e.g., B+)')
+            tier_rating = tier_rating.rstrip('+')
+            if tier_rating not in VALID_TIERS:
+                raise ValueError(f"Unknown tier rating '{tier_rating}'")
+            if is_plus:
+                tier_rating += '+'
+
             # Extract file ID from the image URL/ID
             image_path = None
-            image_url = record.get('Upload a picture!', '').strip()
-            
+            image_url = get_field(record, 'Upload a picture!')
+
             if image_url:
                 file_id = extract_file_id(image_url)
                 if file_id:
                     if file_id not in processed_images:
                         image_path = download_and_save_image(
-                            drive_service, 
+                            drive_service,
                             file_id,
-                            record['Place Name']
+                            place_name
                         )
                         if image_path:
                             processed_images.add(file_id)
                 else:
-                    print(f"Could not extract valid file ID from URL for {record['Place Name']}: {image_url}")
-            
-            country, state = process_geo_data(record[address_column])
-            
-            tier_rating = record['Tier Rating'].strip().upper()
-            if '+' in record.get('Add a plus (e.g., B+)', ''):
-                tier_rating += '+'
+                    print(f"Could not extract valid file ID from URL for {place_name}: {image_url}")
+
+            country, state = process_geo_data(address)
 
             processed_place = {
                 'id': idx,
-                'name': record['Place Name'].strip(),
+                'name': place_name,
                 'tier': tier_rating,
-                'ordered': record['What did you order?'].strip(),
-                'notes': record['Notes'].strip(),
+                'ordered': get_field(record, 'What did you order?'),
+                'notes': get_field(record, 'Notes'),
                 'imagePath': image_path,  # This will be None if no image or download failed
                 'lat': lat,
                 'lng': lng,
-                'lastUpdated': pd.Timestamp.now().isoformat(),
+                'lastUpdated': datetime.now().isoformat(),
                 'country': country,
                 'state': state
             }
-            
+
             # Add address if available
             if address_column in record:
-                processed_place['address'] = record[address_column].strip()
-            
+                processed_place['address'] = address
+
             processed_places.append(processed_place)
-            print(f"Successfully processed {record['Place Name']}")
-            
+            print(f"Successfully processed {place_name}")
+
         except Exception as e:
-            error_msg = f"Error in row {idx + 2}: {str(e)}"
+            error_msg = f"Row {idx + 2} ({place_name}): {str(e)}"
             errors.append(error_msg)
             print(error_msg)
             continue
-    
+
     # Save the updated coordinates cache
     save_coordinates_cache(coordinates_cache)
-    
+
     if errors:
         print("\nProcessing completed with errors:")
         for error in errors:
             print(f"- {error}")
-    
+        report_skipped_rows(errors)
+
     # Save to public folder instead of src
     output_path = Path('public/data/places.json')
     output_path.parent.mkdir(parents=True, exist_ok=True)

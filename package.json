@@ -2,7 +2,7 @@
   "name": "matcha-reviews",
   "version": "0.1.0",
   "private": true,
-  "homepage": "https://jaylenwang7.github.io/isasmatcharatings",
+  "homepage": "https://jaylenwang.com/isasmatcharatings",
   "dependencies": {
     "@tailwindcss/typography": "^0.5.10",
     "autoprefixer": "^10.4.17",

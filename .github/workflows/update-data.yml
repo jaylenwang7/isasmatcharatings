@@ -1,17 +1,20 @@
-# .github/workflows/update-data.yml
 name: Update Data and Deploy
 on:
   push:
     branches: [ main ]  # Triggers on push to main branch
   schedule:
-    - cron: '0 0 * * *'  # Runs daily at midnight
-  workflow_dispatch:      # Allows manual triggers
+    - cron: '0 0 * * *'  # Runs daily at midnight UTC, to pick up edits made directly in the sheet
+  workflow_dispatch:      # Manual runs, and form submissions via scripts/trigger-deploy.gs
 
-# Important: This ensures the action has permission to deploy to Pages
 permissions:
-  contents: write
+  contents: read
   pages: write
   id-token: write
+
+# Queue runs instead of overlapping them, so back-to-back form submissions don't race each other's deploys
+concurrency:
+  group: pages
+  cancel-in-progress: false
 
 jobs:
   build-and-deploy:
@@ -20,55 +23,56 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+      - uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v7
         with:
-          python-version: '3.10'
-          
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: scripts/requirements.txt
+
       - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install pandas gspread oauth2client google-api-python-client google-auth-httplib2 google-auth-oauthlib
+        run: pip install -r scripts/requirements.txt
+
+      # Geocoded coordinates and resized photos from earlier runs, so each build only fetches what's new
+      - name: Restore fetch cache
+        uses: actions/cache@v6
+        with:
+          path: .cache
+          key: fetch-cache-${{ github.run_id }}
+          restore-keys: fetch-cache-
 
       - name: Create credentials file
-        run: |
-          echo '${{ secrets.GOOGLE_SHEETS_CREDENTIALS }}' > credentials.json
-        
+        run: printf '%s' "$GOOGLE_SHEETS_CREDENTIALS" > credentials.json
+        env:
+          GOOGLE_SHEETS_CREDENTIALS: ${{ secrets.GOOGLE_SHEETS_CREDENTIALS }}
+
       - name: Fetch and transform data
         run: python scripts/fetch_data.py
         env:
           SHEET_ID: ${{ secrets.SHEET_ID }}
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: '18'
-      
-      - name: Clear npm cache and node_modules
-        run: |
-          npm cache clean --force
-          rm -rf node_modules package-lock.json
+          node-version: '22'
+          cache: npm
 
       - name: Install Dependencies
-        run: |
-          npm install --legacy-peer-deps
-          npm install react-scripts --save
+        run: npm ci
 
       - name: Build
         run: npm run build
 
       - name: Setup Pages
-        uses: actions/configure-pages@v4
+        uses: actions/configure-pages@v6
 
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: './build'
 
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
