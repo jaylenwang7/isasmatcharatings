@@ -13,6 +13,18 @@ It can also be run by hand from the Actions tab.
 
 Reviews that can't be published (for example, an address that can't be geocoded and no lat/long) are listed in the workflow run's summary.
 
+## Deploy and check
+
+`scripts/check-deploy.sh` watches the deploy and then confirms the live site is serving reviews, listing any reviews the run skipped:
+
+```sh
+scripts/check-deploy.sh            # watch the run for the current commit
+scripts/check-deploy.sh --push     # push the current branch first, then watch
+scripts/check-deploy.sh --refresh  # rebuild from the sheet now, without a commit
+```
+
+It also stops early if GitHub has disabled the workflow, and prints the command to re-enable it.
+
 The repository must stay public: GitHub Pages only serves private repositories on paid plans.
 GitHub also turns off the nightly run after 60 days without a commit, which is why form submissions trigger deploys directly.
 
