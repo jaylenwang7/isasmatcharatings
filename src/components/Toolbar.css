@@ -46,6 +46,13 @@
   font-variant-numeric: tabular-nums;
 }
 
+.city--more {
+  color: var(--ink-faint);
+  text-decoration: underline;
+  text-decoration-color: var(--line-strong);
+  text-underline-offset: 4px;
+}
+
 .city:hover,
 .city[aria-pressed='true'] {
   color: var(--ink);

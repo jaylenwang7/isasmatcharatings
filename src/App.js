@@ -11,6 +11,7 @@ import Colophon from './components/Colophon';
 import './App.css';
 
 const loadMap = () => import('./components/MatchaMap');
+const prefersReducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const MatchaMap = lazy(loadMap);
 
 // How much of the map each kind of note covers, so the map can keep the pin above it
@@ -21,6 +22,8 @@ export default function App() {
   const [loadError, setLoadError] = useState(null);
   const [city, setCity] = useState(null);
   const [query, setQuery] = useState('');
+  // The review under the mouse in the list, which the map lights up
+  const [hoveredSlug, setHoveredSlug] = useState(null);
   const { route, navigate, goBack } = useHashRoute();
   const isWide = useMediaQuery('(min-width: 960px)');
 
@@ -38,6 +41,7 @@ export default function App() {
     () => (places || []).filter((place) => (!city || place.city === city) && matchesQuery(place, query)),
     [places, city, query]
   );
+  const visibleIds = useMemo(() => new Set(visible.map((place) => place.slug)), [visible]);
   const selected = places?.find((place) => place.slug === route.slug) || null;
   // With nothing filtered, the map opens on the home city rather than the whole world
   // (the map only uses this for its first view)
@@ -79,6 +83,32 @@ export default function App() {
     window.scrollTo(0, route.view === 'map' ? 0 : listScroll.current);
   }, [route.view, isWide]);
 
+  // The list follows the map: a review opened from the map scrolls its photo into view, and a new
+  // city filter brings the top of the list back into view. Both skip a list that isn't showing
+  const boardRef = useRef(null);
+  useEffect(() => {
+    const tile = boardRef.current?.querySelector('.tile[aria-current]');
+    if (!tile?.offsetParent) return;
+    const box = tile.getBoundingClientRect();
+    if (box.top >= 0 && box.bottom <= window.innerHeight) return;
+    tile.scrollIntoView({ block: 'center', behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
+  }, [route.slug]);
+  const firstCity = useRef(true);
+  useEffect(() => {
+    if (firstCity.current) {
+      firstCity.current = false;
+      return;
+    }
+    const board = boardRef.current;
+    if (!board?.offsetParent) return;
+    // On phones the toolbar sticks to the top, so stop just below it
+    const stuck = isWide ? 0 : document.querySelector('.toolbar')?.offsetHeight || 0;
+    const target = board.getBoundingClientRect().top + window.scrollY - stuck - 12;
+    if (window.scrollY > target) window.scrollTo({ top: target, behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
+    // Only for a new city, not for a resize
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [city]);
+
   // The phone sheet covers the page, so the page shouldn't scroll behind it
   useEffect(() => {
     if (!selected || noteVariant !== 'sheet') return;
@@ -116,7 +146,7 @@ export default function App() {
           onQueryChange={setQuery}
         />
 
-        <main className="page__board">
+        <main className="page__board" ref={boardRef}>
           {loadError ? (
             <div className="message">
               <p>The reviews didn’t load ({loadError.message}). Check your connection, then reload the page.</p>
@@ -133,7 +163,8 @@ export default function App() {
               hrefFor={hrefFor}
               onOpen={open}
               showCity={!city}
-              hideEmpty={!!query}
+              hideEmpty={!!query || !!city}
+              onHoverPlace={setHoveredSlug}
             />
           ) : (
             <div className="message">
@@ -160,11 +191,15 @@ export default function App() {
             {mapMounted && places && (
               <Suspense fallback={null}>
                 <MatchaMap
-                  places={visible}
+                  places={places}
+                  visibleIds={visibleIds}
                   homePlaces={homePlaces}
                   selected={selected}
                   active={mapShowing}
                   coverFraction={selected ? NOTE_COVER[noteVariant] : 0}
+                  city={city}
+                  onCityChange={setCity}
+                  litSlug={hoveredSlug}
                   onSelect={open}
                   onBackgroundClick={() => selected && close()}
                 />

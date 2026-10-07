@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { AttributionControl, MapContainer, Marker, Popup, TileLayer, useMap, useMapEvents } from 'react-leaflet';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { AttributionControl, MapContainer, Marker, TileLayer, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { countCities, sortPlaces } from '../lib/places';
+import { HOME_CITY } from '../lib/places';
+import { TIERS } from '../tiers';
 import { FitAllIcon, MinusIcon, PlusIcon } from './Icons';
 import './MatchaMap.css';
 
@@ -10,22 +12,50 @@ import './MatchaMap.css';
 
 const WORLD = L.latLngBounds([-85, -180], [85, 180]);
 const MAX_ZOOM = 18;
-// Pins closer together than this, in pixels, merge into one bubble
-const CLUSTER_RADIUS = 40;
-// Zoomed out past this, every marker names its city; zoomed in to this, pins name their place
-const CITY_ZOOM = 9;
+
+// Every review is a bead in its tier's color, at every zoom. Where beads would overlap they pack
+// side by side, best tier first, so each city becomes a cluster you can count. The bead grows with
+// the zoom and becomes a lettered pin at street level; each scale's size is in pixels
+const SCALES = [
+  { name: 'world', below: 4, size: 7 },
+  { name: 'region', below: 10, size: 8 },
+  { name: 'city', below: 12, size: 12 },
+  { name: 'street', below: Infinity, size: 26 },
+];
+// The white ring around each bead; packed beads' rings meet, so a cluster sits on one white backing
+const RING = 2;
+// Below this zoom, city names label the clusters. Clicking a name picks the city; clicking a bead
+// always opens its review, the one its hover card names
+const CITY_LABELS_BELOW = 12;
+// At this zoom, pins name their place
 const NAME_ZOOM = 16;
 const NAME_LENGTH = 24;
 // Extra room at the sides when fitting pins in view, since city labels stick out past their points
 const FIT_OPTIONS = { padding: [110, 56], maxZoom: 14 };
 const prefersReducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-// homePlaces, when given, is where the map opens (Isa's home city) instead of fitting every pin
-export default function MatchaMap({ places, homePlaces, selected, active, coverFraction, onSelect, onBackgroundClick }) {
+// places is every review, so the map can always show them all; visibleIds holds the ones the
+// filters and search let through, and the rest turn gray. Clicking a city on the map sets the city
+// filter (onCityChange). homePlaces, when given, is where the map opens instead of fitting every
+// review. litSlug is the review hovered in the list, which lights up its bead
+export default function MatchaMap({
+  places,
+  visibleIds,
+  homePlaces,
+  selected,
+  active,
+  coverFraction,
+  city,
+  onCityChange,
+  litSlug,
+  onSelect,
+  onBackgroundClick,
+}) {
+  const visible = useMemo(() => places.filter((place) => visibleIds.has(place.slug)), [places, visibleIds]);
   return (
     <MapContainer
       className="map"
-      bounds={boundsOf(homePlaces || []) || boundsOf(places) || WORLD}
+      bounds={boundsOf(homePlaces || []) || boundsOf(visible) || WORLD}
       boundsOptions={FIT_OPTIONS}
       maxBounds={WORLD}
       maxBoundsViscosity={1}
@@ -42,13 +72,24 @@ export default function MatchaMap({ places, homePlaces, selected, active, coverF
         maxZoom={MAX_ZOOM}
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
       />
-      <MapControls places={places} selected={selected} />
+      <MapControls places={visible} selected={selected} coverFraction={coverFraction} city={city} onCityChange={onCityChange} />
       <AttributionControl position="bottomleft" prefix={false} />
       <KeepWorldFilled />
-      <FitToPlaces places={places} homePlaces={homePlaces} active={active} hasSelection={!!selected} />
+      <FitToPlaces places={visible} homePlaces={homePlaces} active={active} hasSelection={!!selected} />
       <FollowSelection selected={selected} active={active} coverFraction={coverFraction} />
       <BackgroundClicks onClick={onBackgroundClick} />
-      <PlaceMarkers places={places} selected={selected} onSelect={onSelect} />
+      <Beads
+        places={places}
+        visibleIds={visibleIds}
+        selected={selected}
+        city={city}
+        litSlug={litSlug}
+        coverFraction={coverFraction}
+        onCityChange={onCityChange}
+        onSelect={onSelect}
+      />
+      {selected && <SelectedPin place={selected} onSelect={onSelect} />}
+      <HoverCard places={places} city={city} />
     </MapContainer>
   );
 }
@@ -114,8 +155,8 @@ function FollowSelection({ selected, active, coverFraction }) {
   return null;
 }
 
-// Zoom buttons, plus one to step back and see every pin
-function MapControls({ places, selected }) {
+// Zoom buttons, plus one to step back and see every review (which also clears the city filter)
+function MapControls({ places, selected, coverFraction, city, onCityChange }) {
   const map = useMap();
   const ref = useRef(null);
   useEffect(() => {
@@ -129,9 +170,19 @@ function MapControls({ places, selected }) {
     else map.setZoom(map.getZoom() + delta);
   };
 
+  // Fit every pin into the part of the map an open note doesn't cover
   const showAll = () => {
+    // Clearing the city lets more reviews through, and the map refits to them (FitToPlaces)
+    if (city) return onCityChange(null);
     const bounds = boundsOf(places);
-    if (bounds) map.flyToBounds(bounds, { ...FIT_OPTIONS, duration: prefersReducedMotion() ? 0 : 0.8 });
+    if (!bounds) return;
+    const [x, y] = FIT_OPTIONS.padding;
+    map.flyToBounds(bounds, {
+      maxZoom: FIT_OPTIONS.maxZoom,
+      paddingTopLeft: [x, y],
+      paddingBottomRight: [x, y + map.getSize().y * coverFraction],
+      duration: prefersReducedMotion() ? 0 : 0.8,
+    });
   };
 
   return (
@@ -156,127 +207,460 @@ function BackgroundClicks({ onClick }) {
   return null;
 }
 
-function PlaceMarkers({ places, selected, onSelect }) {
+// Every review except the open one as a bead, packed by city, with city names placed beside the
+// clusters while zoomed out. Layout runs after each zoom or move and changes the markers' existing
+// elements (CSS variables and classes), never their icons, so nothing under the pointer is replaced
+function Beads({ places, visibleIds, selected, city, litSlug, coverFraction, onCityChange, onSelect }) {
   const map = useMap();
-  // Read the zoom from the map on every render; the state only asks React to re-render when it
-  // changes. The effect catches zooms that happened before this registered its handler
-  const [, setZoomed] = useState(0);
-  const handlers = useMemo(() => ({ zoomend: () => setZoomed((count) => count + 1) }), []);
-  useMapEvents(handlers);
-  useEffect(() => setZoomed((count) => count + 1), []);
-  const zoom = map.getZoom();
+  const markers = useRef(new Map());
+  const labelMarkers = useRef(new Map());
+  const [labels, setLabels] = useState([]);
 
-  // The open review always gets its own pin, outside any bubble
-  const clusters = useMemo(() => {
-    const nearby = clusterPlaces(map, places.filter((place) => place !== selected), zoom);
-    return zoom < CITY_ZOOM ? mergeOverlappingLabels(map, nearby, zoom) : nearby;
-  }, [map, places, selected, zoom]);
+  const beads = useMemo(() => places.filter((place) => place !== selected), [places, selected]);
+  const cities = useMemo(() => groupByCity(places), [places]);
+  // Pack city by city, biggest first and best tier first within each, so every city stays one
+  // compact cluster instead of interleaving with its neighbors when zoomed out
+  const packingOrder = useMemo(
+    () => cities.flatMap((group) => group.places).filter((place) => place !== selected),
+    [cities, selected]
+  );
+
+  // A city with several reviews becomes the city filter; one review just opens
+  const pickCity = useCallback(
+    (group) => {
+      if (group.places.length === 1) return onSelect(group.places[0]);
+      if (group.name === city) map.flyToBounds(boundsOf(group.places), { ...FIT_OPTIONS, duration: prefersReducedMotion() ? 0 : 0.8 });
+      else onCityChange(group.name);
+    },
+    [map, city, onCityChange, onSelect]
+  );
+
+  const layout = useCallback(() => {
+    const zoom = map.getZoom();
+    const scale = SCALES.find((candidate) => zoom < candidate.below);
+    const container = map.getContainer();
+    container.dataset.scale = scale.name;
+    container.dataset.names = String(zoom >= NAME_ZOOM);
+
+    const positions = packBeads(map, packingOrder, scale, selected);
+    positions.forEach(({ dx, dy, crowded }, slug) => {
+      const element = markers.current.get(slug)?.getElement()?.firstElementChild;
+      if (!element) return;
+      element.style.setProperty('--dx', `${dx}px`);
+      element.style.setProperty('--dy', `${dy}px`);
+      element.classList.toggle('bead--crowded', crowded);
+    });
+    setLabels(zoom < CITY_LABELS_BELOW ? placeCityLabels(map, cities, positions, scale, coverFraction) : []);
+  }, [map, packingOrder, selected, cities, coverFraction]);
+
+  // Lay out again after every zoom, move, or resize, and once the label font has loaded (labels
+  // are measured in it). The handler reads the latest layout through a ref, so it stays registered
+  const latestLayout = useRef(layout);
+  latestLayout.current = layout;
+  const handlers = useMemo(() => ({ zoomend: () => latestLayout.current(), moveend: () => latestLayout.current() }), []);
+  useMapEvents(handlers);
+  useEffect(() => {
+    layout();
+  }, [layout]);
+  useEffect(() => {
+    document.fonts?.ready.then(() => latestLayout.current());
+  }, []);
+
+  // Filtered-out reviews turn gray, and the review hovered in the list lights up
+  useEffect(() => {
+    markers.current.forEach((marker, slug) => {
+      const ghost = !visibleIds.has(slug);
+      const lit = slug === litSlug;
+      const element = marker.getElement()?.firstElementChild;
+      element?.classList.toggle('bead--ghost', ghost);
+      element?.classList.toggle('bead--lit', lit);
+      marker.setZIndexOffset(lit ? 900 : ghost ? -500 : 0);
+    });
+  }, [visibleIds, litSlug, beads]);
+
+  useEffect(() => {
+    labelMarkers.current.forEach((marker, name) => {
+      const group = cities.find((candidate) => candidate.name === name);
+      const element = marker.getElement()?.firstElementChild;
+      element?.classList.toggle('city-label--on', name === city);
+      element?.classList.toggle('city-label--ghost', !group?.places.some((place) => visibleIds.has(place.slug)));
+    });
+  }, [labels, cities, city, visibleIds]);
+
+  const register = (registry, key) => (marker) => {
+    if (marker) registry.current.set(key, marker);
+    else registry.current.delete(key);
+  };
 
   return (
     <>
-      {clusters.map((cluster) =>
-        cluster.places.length === 1 && zoom >= CITY_ZOOM ? (
-          <PlacePin key={cluster.places[0].slug} place={cluster.places[0]} showName={zoom >= NAME_ZOOM} onSelect={onSelect} />
-        ) : (
-          <ClusterBubble key={cluster.places.map((place) => place.slug).join()} cluster={cluster} zoom={zoom} onSelect={onSelect} />
-        )
-      )}
-      {selected && <PlacePin place={selected} selected showName onSelect={onSelect} />}
+      {beads.map((place) => (
+        <Marker
+          key={place.slug}
+          ref={register(markers, place.slug)}
+          position={[place.lat, place.lng]}
+          icon={beadIcon(place)}
+          keyboard={false}
+          eventHandlers={{ click: () => onSelect(place) }}
+        />
+      ))}
+      {labels.map(({ group, position, showCount }) => (
+        <Marker
+          key={group.name}
+          ref={register(labelMarkers, group.name)}
+          position={position}
+          icon={cityLabelIcon(group, showCount)}
+          zIndexOffset={2000}
+          eventHandlers={{ click: () => pickCity(group) }}
+        />
+      ))}
     </>
   );
 }
 
-// Greedy clustering in screen space: each place joins the first bubble within reach. Places
-// arrive best tier first, so a bubble's first place is its best one
-function clusterPlaces(map, places, zoom) {
-  const clusters = [];
+// Reviews grouped by city, most reviews first
+function groupByCity(places) {
+  const groups = new Map();
   places.forEach((place) => {
-    const point = map.project([place.lat, place.lng], zoom);
-    const near = clusters.find((cluster) => cluster.point.distanceTo(point) < CLUSTER_RADIUS);
-    if (near) near.places.push(place);
-    else clusters.push({ point, places: [place] });
+    const name = place.city || place.name;
+    if (!groups.has(name)) groups.set(name, { name, places: [] });
+    groups.get(name).places.push(place);
   });
-  return clusters.map(({ places }) => withPosition(places));
+  return [...groups.values()].sort((a, b) => b.places.length - a.places.length || a.name.localeCompare(b.name));
 }
 
-const withPosition = (places) => ({
-  places,
-  position: [average(places.map((place) => place.lat)), average(places.map((place) => place.lng))],
-});
+// Find each bead a spot near its true position where it doesn't overlap another, spiraling
+// outward from the true point. Earlier places keep their spots, so callers pass the order that
+// matters. Returns each bead's container position and its offset from its true point, by slug
+function packBeads(map, places, scale, selected) {
+  const step = scale.size + RING + (scale.name === 'street' ? 2 : 0);
+  const placed = [];
+  // The open review's big pin is in the way too
+  if (selected) placed.push({ ...map.latLngToContainerPoint([selected.lat, selected.lng]), clearance: 24 + step / 2 });
+  const free = (x, y) => placed.every((other) => (other.x - x) ** 2 + (other.y - y) ** 2 >= (other.clearance - 0.01) ** 2);
 
-// Zoomed out, bubbles carry city names and grow wide, so merge any whose labels would overlap
-function mergeOverlappingLabels(map, clusters, zoom) {
-  const box = (cluster) => {
-    const { x, y } = map.project(cluster.position, zoom);
-    // Roughly the bubble's size: a 22px count, padding, and about 7px per character of label
-    const halfWidth = (40 + 7 * cityLabel(cluster.places).length) / 2 + 4;
-    return { left: x - halfWidth, right: x + halfWidth, top: y - 19, bottom: y + 19 };
-  };
-  const overlap = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
-
-  const merged = [...clusters];
-  for (let i = 0; i < merged.length; i++) {
-    for (let j = i + 1; j < merged.length; j++) {
-      if (overlap(box(merged[i]), box(merged[j]))) {
-        merged[i] = withPosition(sortPlaces([...merged[i].places, ...merged[j].places]));
-        merged.splice(j, 1);
-        // The merged bubble is wider, so check it against everything again
-        j = i;
+  const positions = new Map();
+  places.forEach((place) => {
+    const point = map.latLngToContainerPoint([place.lat, place.lng]);
+    let spot = free(point.x, point.y) ? point : null;
+    for (let ring = 1; !spot && ring < 400; ring++) {
+      const radius = ring * step * 0.2;
+      const count = Math.max(6, Math.ceil((2 * Math.PI * radius) / (step * 0.2)));
+      for (let i = 0; i < count && !spot; i++) {
+        const angle = -Math.PI / 2 + (i * 2 * Math.PI) / count;
+        const x = point.x + radius * Math.cos(angle);
+        const y = point.y + radius * Math.sin(angle);
+        if (free(x, y)) spot = { x, y };
       }
     }
-  }
-  return merged;
+    spot = spot || point;
+    placed.push({ x: spot.x, y: spot.y, clearance: step });
+    const dx = spot.x - point.x;
+    const dy = spot.y - point.y;
+    // A pin pushed far from its place would point at the wrong building, so it stays a bead
+    // until there's room
+    positions.set(place.slug, { x: spot.x, y: spot.y, dx, dy, crowded: scale.name === 'street' && Math.hypot(dx, dy) > step * 1.2 });
+  });
+  return positions;
 }
 
-const average = (numbers) => numbers.reduce((sum, n) => sum + n, 0) / numbers.length;
+// Put each city's name beside its beads, biggest city first. A label must fit inside the map and
+// avoid every bead, the controls, the attribution, and an open note. It should sit nearer its own
+// city's beads than any other city's, so it can't seem to name a neighbor. When cities run
+// together (zoomed far out), the biggest city in each run-together group may instead label the
+// group from its edge. Failing all that, a label is left out; its beads stay
+function placeCityLabels(map, cities, positions, scale, coverFraction) {
+  const { x: width, y: height } = map.getSize();
+  const step = scale.size + RING;
+  const half = step / 2;
+  const box = (left, top, w, h) => ({ left, top, right: left + w, bottom: top + h });
+  const overlaps = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+  const fits = (b) => b.left >= 6 && b.top >= 6 && b.right <= width - 6 && b.bottom <= height - 6;
+  const distance = (b, point) =>
+    Math.hypot(Math.max(b.left - point.x, 0, point.x - b.right), Math.max(b.top - point.y, 0, point.y - b.bottom));
+  const nearest = (b, beads) => Math.min(Infinity, ...beads.map((bead) => distance(b, bead)));
+  const boundsOfBeads = (beads) => ({
+    left: Math.min(...beads.map((b) => b.x)) - half,
+    right: Math.max(...beads.map((b) => b.x)) + half,
+    top: Math.min(...beads.map((b) => b.y)) - half,
+    bottom: Math.max(...beads.map((b) => b.y)) + half,
+  });
 
-function PlacePin({ place, selected = false, showName = false, onSelect }) {
-  const icon = useMemo(() => pinIcon(place, { selected, showName }), [place, selected, showName]);
+  const beads = [...positions.values()];
+  const taken = [
+    ...beads.map(({ x, y }) => box(x - half, y - half, step, step)),
+    box(width - 60, 0, 60, 140), // zoom and show-everything buttons
+    box(0, height - 22, 190, 22), // attribution
+  ];
+  if (coverFraction) taken.push(box(0, height * (1 - coverFraction) - 16, width, height * coverFraction + 16));
+
+  // Beads that touch form one group (union-find)
+  const parent = beads.map((_, i) => i);
+  const find = (i) => (parent[i] === i ? i : (parent[i] = find(parent[i])));
+  beads.forEach((a, i) =>
+    beads.forEach((b, j) => {
+      if (j > i && Math.hypot(a.x - b.x, a.y - b.y) <= step * 1.08) parent[find(i)] = find(j);
+    })
+  );
+  const groupOf = new Map(beads.map((bead, i) => [bead, find(i)]));
+
+  // The eight spots around a box, best first: right, left, above, below, then the corners
+  const spotsAround = ({ left, right, top, bottom }, w) => {
+    const h = 17;
+    const gap = 5;
+    return [
+      box(right + gap, (top + bottom - h) / 2, w, h),
+      box(left - gap - w, (top + bottom - h) / 2, w, h),
+      box((left + right - w) / 2, top - gap - h, w, h),
+      box((left + right - w) / 2, bottom + gap, w, h),
+      box(right + 1, top - h + 3, w, h),
+      box(right + 1, bottom - 3, w, h),
+      box(left - 1 - w, top - h + 3, w, h),
+      box(left - 1 - w, bottom - 3, w, h),
+    ];
+  };
+
+  const claimedGroups = new Set();
+  const labels = [];
+  cities.forEach((city) => {
+    const own = city.places.map((place) => positions.get(place.slug)).filter(Boolean);
+    if (!own.length) return;
+    const ownSet = new Set(own);
+    const others = beads.filter((bead) => !ownSet.has(bead));
+    const groups = new Set(own.map((bead) => groupOf.get(bead)));
+    const groupBeads = beads.filter((bead) => groups.has(groupOf.get(bead)));
+    const sharesGroup = groupBeads.length > own.length;
+
+    const attempts = [
+      { around: own, counted: true, ok: (b) => nearest(b, others) > nearest(b, own) + 2 },
+      { around: own, counted: false, ok: (b) => nearest(b, others) > nearest(b, own) + 2 },
+    ];
+    if (sharesGroup && ![...groups].some((id) => claimedGroups.has(id))) {
+      // Distances run from bead centers, and a group's edge is ragged, so allow a bead or so of slack
+      const besideGroup = (b) => nearest(b, groupBeads) <= half + step + 6;
+      attempts.push(
+        { around: groupBeads, counted: true, ok: besideGroup, claims: true },
+        { around: groupBeads, counted: false, ok: besideGroup, claims: true }
+      );
+    }
+    for (const { around, counted, ok, claims } of attempts) {
+      if (counted && city.places.length === 1) continue;
+      const spot = spotsAround(boundsOfBeads(around), cityLabelWidth(city, counted)).find(
+        (b) => fits(b) && !taken.some((t) => overlaps(b, t)) && ok(b)
+      );
+      if (!spot) continue;
+      taken.push(spot);
+      if (claims) groups.forEach((id) => claimedGroups.add(id));
+      labels.push({ group: city, showCount: counted, position: map.containerPointToLatLng([spot.left, spot.top]) });
+      return;
+    }
+  });
+  return labels;
+}
+
+// "Pittsburgh, 17 reviews: 5 A, 7 B, 2 C, 3 D", for screen readers
+function describeCity(group) {
+  const count = group.places.length;
+  const tiers = TIERS.map(({ letter }) => [letter, group.places.filter((place) => place.tier === letter).length])
+    .filter(([, n]) => n)
+    .map(([letter, n]) => `${n} ${letter}`)
+    .join(', ');
+  return `${group.name}, ${count} ${count === 1 ? 'review' : 'reviews'}: ${tiers}`;
+}
+
+// Measure label text in the page's own fonts, so labels pack tightly without overlapping
+const measureContext = document.createElement('canvas').getContext('2d');
+function textWidth(text, font) {
+  measureContext.font = font;
+  return measureContext.measureText(text).width;
+}
+const cityLabelWidth = (group, showCount) =>
+  (group.name === HOME_CITY ? 19 : 0) +
+  textWidth(group.name, '700 13px "Zen Kaku Gothic New"') +
+  (showCount ? 5 + textWidth(String(group.places.length), '500 11.5px "Zen Kaku Gothic New"') : 0) +
+  2;
+
+// Hovering a bead with a mouse shows a small card with its photo, name, city, and grade; hovering or
+// focusing a city name shows the city's tiers and photos. One card, driven by listeners on the
+// marker pane: it never replaces a marker, and it clears whenever the pointer leaves, the map
+// starts moving, or Escape is pressed, so it can't get stuck
+const CARD_WIDTH = { place: 212, city: 252 };
+// Heights are estimates, used only to decide where a card fits
+const CARD_HEIGHT = { place: 76, city: 176 };
+
+function HoverCard({ places, city }) {
+  const map = useMap();
+  const [card, setCard] = useState(null);
+  const bySlug = useMemo(() => new Map(places.map((place) => [place.slug, place])), [places]);
+  const byCity = useMemo(() => new Map(groupByCity(places).map((group) => [group.name, group])), [places]);
+
+  useEffect(() => {
+    const pane = map.getPane('markerPane');
+    const container = map.getContainer();
+    const clear = () => setCard(null);
+    const relative = (box) => {
+      const mapBox = container.getBoundingClientRect();
+      return { left: box.left - mapBox.left, right: box.right - mapBox.left, top: box.top - mapBox.top, bottom: box.bottom - mapBox.top };
+    };
+    // The box around a set of elements, relative to the map
+    const around = (elements) =>
+      relative(
+        elements
+          .map((element) => element.getBoundingClientRect())
+          .reduce((a, b) => ({
+            left: Math.min(a.left, b.left),
+            right: Math.max(a.right, b.right),
+            top: Math.min(a.top, b.top),
+            bottom: Math.max(a.bottom, b.bottom),
+          }))
+      );
+
+    const show = (element) => {
+      if (element.classList.contains('bead')) {
+        const place = bySlug.get(element.dataset.slug);
+        if (place) setCard({ kind: 'place', place, anchor: around([element]) });
+        return;
+      }
+      const group = byCity.get(element.dataset.city);
+      if (!group) return;
+      // A city with one review shows that review, since clicking its name opens it
+      if (group.places.length === 1) return setCard({ kind: 'place', place: group.places[0], anchor: around([element]) });
+      // Keep the card off the city's own beads as well as its name
+      const beads = [...pane.querySelectorAll('.bead')].filter((bead) => bead.dataset.city === group.name);
+      setCard({ kind: 'city', group, anchor: around([element, ...beads]) });
+    };
+    const target = (event) => event.target.closest?.('.bead, .city-label') || event.target.querySelector?.('.bead, .city-label');
+
+    const onOver = (event) => {
+      const element = target(event);
+      if (event.pointerType === 'mouse' && element) show(element);
+    };
+    const onOut = (event) => {
+      const element = target(event);
+      if (element && !element.contains(event.relatedTarget)) clear();
+    };
+    const onFocus = (event) => {
+      const element = target(event);
+      if (element?.classList.contains('city-label')) show(element);
+    };
+    const onKeyDown = (event) => event.key === 'Escape' && clear();
+    pane.addEventListener('pointerover', onOver);
+    pane.addEventListener('pointerout', onOut);
+    pane.addEventListener('focusin', onFocus);
+    pane.addEventListener('focusout', clear);
+    container.addEventListener('pointerleave', clear);
+    container.addEventListener('keydown', onKeyDown);
+    map.on('movestart zoomstart', clear);
+    window.addEventListener('blur', clear);
+    return () => {
+      pane.removeEventListener('pointerover', onOver);
+      pane.removeEventListener('pointerout', onOut);
+      pane.removeEventListener('focusin', onFocus);
+      pane.removeEventListener('focusout', clear);
+      container.removeEventListener('pointerleave', clear);
+      container.removeEventListener('keydown', onKeyDown);
+      map.off('movestart zoomstart', clear);
+      window.removeEventListener('blur', clear);
+    };
+  }, [map, bySlug, byCity]);
+
+  // A review that's filtered away or opened shouldn't leave its card behind
+  useEffect(() => {
+    if (card?.kind === 'place' && !bySlug.has(card.place.slug)) setCard(null);
+  }, [card, bySlug]);
+
+  if (!card) return null;
+  const { x: mapWidth, y: mapHeight } = map.getSize();
+  const width = CARD_WIDTH[card.kind];
+  const height = CARD_HEIGHT[card.kind];
+  const { anchor } = card;
+  // A review's card sits above its bead; a city's goes below the city, else above, else beside it
+  const fitsAbove = anchor.top - 8 - height >= 6;
+  const fitsBelow = anchor.bottom + 8 + height <= mapHeight - 6;
+  const order = card.kind === 'place' ? ['above', 'below'] : ['below', 'above'];
+  const side = order.find((s) => (s === 'above' ? fitsAbove : fitsBelow)) || 'beside';
+  const centerX = (anchor.left + anchor.right) / 2;
+  // A card above is pinned by its bottom edge, so it sits just above the anchor whatever its real height
+  const style = { width, left: Math.min(Math.max(centerX - width / 2, 8), mapWidth - width - 8) };
+  if (side === 'above') style.bottom = mapHeight - anchor.top + 8;
+  else if (side === 'below') style.top = anchor.bottom + 8;
+  else {
+    style.left = anchor.right + 8 + width <= mapWidth - 8 ? anchor.right + 8 : Math.max(8, anchor.left - 8 - width);
+    style.top = Math.min(Math.max((anchor.top + anchor.bottom) / 2 - height / 2, 8), mapHeight - height - 8);
+  }
+
+  return createPortal(
+    card.kind === 'place' ? (
+      <PlaceCard place={card.place} style={style} />
+    ) : (
+      <CityCard group={card.group} selected={card.group.name === city} style={style} />
+    ),
+    map.getContainer()
+  );
+}
+
+function PlaceCard({ place, style }) {
+  return (
+    <div className="peek" data-tier={place.tier} style={style} aria-hidden="true">
+      {place.thumb ? <img className="peek__photo" src={place.thumb} alt="" /> : <span className="peek__photo peek__photo--none" />}
+      <span className="peek__text">
+        <span className="peek__name">{place.name}</span>
+        {place.city && <span className="peek__city">{place.city}</span>}
+      </span>
+      <span className="peek__grade">{place.grade}</span>
+    </div>
+  );
+}
+
+// A city at a glance: how many reviews, how they split across tiers, and the best few photos
+function CityCard({ group, selected, style }) {
+  const shown = group.places.slice(0, 4);
+  const more = group.places.length - shown.length;
+  return (
+    <div className="city-card" style={style} aria-hidden="true">
+      <div className="city-card__head">
+        <span className="city-card__name">{group.name}</span>
+        <span className="city-card__count">{group.places.length} reviews</span>
+      </div>
+      <ul className="city-card__tiers">
+        {TIERS.map(({ letter }) => {
+          const count = group.places.filter((place) => place.tier === letter).length;
+          return (
+            count > 0 && (
+              <li key={letter}>
+                <b data-tier={letter}>{letter}</b>
+                {count}
+              </li>
+            )
+          );
+        })}
+      </ul>
+      <div className="city-card__photos">
+        {shown.map((place) =>
+          place.thumb ? (
+            <img key={place.slug} src={place.thumb} alt="" />
+          ) : (
+            <span key={place.slug} className="city-card__no-photo" data-tier={place.tier} />
+          )
+        )}
+        {more > 0 && <span className="city-card__more">+{more}</span>}
+      </div>
+      <p className="city-card__hint">{selected ? 'Showing these in the list' : 'Click to show them in the list'}</p>
+    </div>
+  );
+}
+
+// The open review: a big pin with its name, underlined in Isa's pen
+function SelectedPin({ place, onSelect }) {
+  const icon = useMemo(() => pinIcon(place), [place]);
   return (
     <Marker
       position={[place.lat, place.lng]}
       icon={icon}
       title={`${place.name}, ${place.grade} tier`}
-      zIndexOffset={selected ? 1000 : 0}
+      zIndexOffset={1000}
       eventHandlers={{ click: () => onSelect(place) }}
     />
-  );
-}
-
-function ClusterBubble({ cluster, zoom, onSelect }) {
-  const map = useMap();
-  const { places, position } = cluster;
-  const bounds = boundsOf(places);
-  // Places at the same address can't be pulled apart by zooming, so list them instead
-  const inseparable = places.length > 1 && map.getBoundsZoom(bounds) >= MAX_ZOOM;
-  const icon = useMemo(() => bubbleIcon(places, zoom < CITY_ZOOM), [places, zoom]);
-
-  return (
-    <Marker
-      position={position}
-      icon={icon}
-      title={places.length > 1 ? `${places.length} reviews` : `${places[0].name}, ${places[0].grade} tier`}
-      eventHandlers={{
-        click: () => {
-          if (places.length === 1) onSelect(places[0]);
-          else if (!inseparable) map.flyToBounds(bounds, { padding: [64, 64], maxZoom: 16, duration: 0.7 });
-        },
-      }}
-    >
-      {inseparable && (
-        <Popup className="map-popup" closeButton={false}>
-          <ul>
-            {places.map((place) => (
-              <li key={place.slug}>
-                <button type="button" data-tier={place.tier} onClick={() => onSelect(place)}>
-                  <span className="map-popup__tier">{place.grade}</span> {place.name}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </Popup>
-      )}
-    </Marker>
   );
 }
 
@@ -285,47 +669,54 @@ const escapeHtml = (text) =>
 
 const truncate = (text, length) => (text.length > length ? `${text.slice(0, length - 1).trimEnd()}…` : text);
 
-// Pins and bubbles are sized by CSS and centered on their point with a transform, so no iconSize
+// Markers are sized by CSS and centered on their point with a transform, so icons have no iconSize.
 // The same pen stroke as PenUnderline, for marker HTML
-const PEN_UNDERLINE =
-  '<svg class="pen-mark pin__underline" viewBox="0 0 120 12" preserveAspectRatio="none" aria-hidden="true">' +
+const penUnderline = (className) =>
+  `<svg class="pen-mark ${className}" viewBox="0 0 120 12" preserveAspectRatio="none" aria-hidden="true">` +
   '<path pathLength="1" vector-effect="non-scaling-stroke" d="M3 7c22-3 44-4 66-3s34 2 48-1"/></svg>';
 
-// A pin shows the grade; a plus grade ("A+") stretches the circle into a pill
-function pinIcon(place, { selected, showName }) {
-  const classes = ['pin', place.plus && 'pin--plus', selected && 'pin--selected'].filter(Boolean).join(' ');
-  const name = showName
-    ? `<span class="pin__name${selected ? ' pin__name--selected' : ''}">${escapeHtml(truncate(place.name, NAME_LENGTH))}${
-        selected ? PEN_UNDERLINE : ''
-      }</span>`
-    : '';
+// The open review's pin shows its grade (a plus grade stretches it into a pill) and its name
+function pinIcon(place) {
   return L.divIcon({
     className: 'map-marker',
     iconSize: null,
-    html: `<span class="${classes}" data-tier="${place.tier}">${place.grade}</span>${name}`,
+    html:
+      `<span class="pin pin--selected${place.plus ? ' pin--plus' : ''}" data-tier="${place.tier}">${place.grade}</span>` +
+      `<span class="pin__name pin__name--selected">${escapeHtml(truncate(place.name, NAME_LENGTH))}${penUnderline('pin__underline')}</span>`,
   });
 }
 
-// The city with the most of these reviews, noting when there are others too
-function cityLabel(places) {
-  const cities = countCities(places);
-  if (!cities.length) return '';
-  return cities.length > 1 ? `${cities[0].name} & more` : cities[0].name;
+// One icon per review, made once: a bead holding its grade and name, which CSS shows at street zoom
+const beadIcons = new Map();
+function beadIcon(place) {
+  const key = `${place.slug}|${place.grade}|${place.name}`;
+  if (!beadIcons.has(key)) {
+    beadIcons.set(
+      key,
+      L.divIcon({
+        className: 'map-marker',
+        iconSize: null,
+        html:
+          `<span class="bead${place.plus ? ' bead--plus' : ''}" data-tier="${place.tier}" data-slug="${escapeHtml(place.slug)}" data-city="${escapeHtml(place.city || place.name)}">` +
+          `<span class="bead__grade">${place.grade}</span>` +
+          `<span class="bead__name">${escapeHtml(truncate(place.name, NAME_LENGTH))}</span></span>`,
+      })
+    );
+  }
+  return beadIcons.get(key);
 }
 
-// A bubble counts the reviews it holds. Zoomed out, it also names their city, and a lone
-// review shows its tier instead of a count of one
-function bubbleIcon(places, nameCity) {
-  const label = nameCity ? cityLabel(places) : '';
-  const lead =
-    places.length === 1
-      ? `<b class="bubble__tier">${places[0].grade}</b>`
-      : `<b class="bubble__count">${places.length}</b>`;
-  return L.divIcon({
-    className: 'map-marker',
-    iconSize: null,
-    html: `<span class="bubble${label ? '' : ' bubble--bare'}" data-tier="${places[0].tier}">${lead}${
-      label ? `<span class="bubble__label">${escapeHtml(label)}</span>` : ''
-    }</span>`,
-  });
+// City labels sit with their top left corner on their point (see placeCityLabels). Icons are
+// cached, and the selected city's pen underline is always there for a class to show
+const BRIDGE =
+  '<svg class="city-label__bridge" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+  '<path d="M2 16h20M6 7v9M18 7v9M2 9c2 0 3 0 4-2 2 5 10 5 12 0 1 2 2 2 4 2M10 10.6V16M14 10.6V16"/></svg>';
+const cityLabelIcons = new Map();
+function cityLabelIcon(group, showCount) {
+  const html =
+    `<span class="city-label" data-city="${escapeHtml(group.name)}">${group.name === HOME_CITY ? BRIDGE : ''}${escapeHtml(group.name)}` +
+    `${showCount ? `<span class="city-label__count" aria-hidden="true">${group.places.length}</span>` : ''}` +
+    `<span class="visually-hidden">${escapeHtml(describeCity(group).slice(group.name.length))}</span>${penUnderline('city-label__pen')}</span>`;
+  if (!cityLabelIcons.has(html)) cityLabelIcons.set(html, L.divIcon({ className: 'map-marker', iconSize: null, html }));
+  return cityLabelIcons.get(html);
 }

@@ -4,7 +4,8 @@ import './TierBoard.css';
 
 // The tier list: one row per tier, best first. Each row's colored label holds the tier's
 // letter and what Isa means by it, and a photo tile for each review follows
-export default function TierBoard({ places, selectedSlug, hrefFor, onOpen, showCity, hideEmpty }) {
+// onHoverPlace reports the tile under the mouse, so the map can light up its bead
+export default function TierBoard({ places, selectedSlug, hrefFor, onOpen, showCity, hideEmpty, onHoverPlace }) {
   return (
     <div className="board">
       {TIERS.map((tier) => {
@@ -22,6 +23,7 @@ export default function TierBoard({ places, selectedSlug, hrefFor, onOpen, showC
                       selected={place.slug === selectedSlug}
                       showCity={showCity}
                       onOpen={onOpen}
+                      onHover={onHoverPlace}
                     />
                   </li>
                 ))}
@@ -53,7 +55,7 @@ function TierRow({ tier, children }) {
   );
 }
 
-function PlaceTile({ place, href, selected, showCity, onOpen }) {
+function PlaceTile({ place, href, selected, showCity, onOpen, onHover }) {
   const handleClick = (event) => {
     // Let modified clicks open the review in a new tab
     if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
@@ -62,7 +64,15 @@ function PlaceTile({ place, href, selected, showCity, onOpen }) {
   };
 
   return (
-    <a className="tile" href={href} onClick={handleClick} aria-current={selected ? 'true' : undefined}>
+    <a
+      className="tile"
+      href={href}
+      onClick={handleClick}
+      aria-current={selected ? 'true' : undefined}
+      // Mouse only: on touch screens a tap would leave the highlight stuck on
+      onPointerEnter={(event) => event.pointerType === 'mouse' && onHover?.(place.slug)}
+      onPointerLeave={(event) => event.pointerType === 'mouse' && onHover?.(null)}
+    >
       <span className="tile__photo">
         {place.thumb ? (
           <img src={place.thumb} alt="" loading="lazy" decoding="async" />
