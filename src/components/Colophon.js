@@ -7,9 +7,9 @@ export default function Colophon({ places }) {
   return (
     <footer className="colophon">
       <p>
-        Every rating, photo, and note is Isa’s. Made by Jaylen for Isa.
+        Every rating, photo, and note is from Isa (yuh). Website maintained by Jaylen.
         <br />
-        The tier colors run from fresh, ceremonial-grade green at S to oxidized brown at F, the way matcha fades.
+        The tier colors are meant to fade the way matcha does.
       </p>
       {updated && <p className="colophon__updated">Updated {formatReviewed(updated.slice(0, 10))}</p>}
     </footer>
