@@ -31,7 +31,8 @@ export default function PlaceNote({ place, variant, prev, next, onNavigate, onCl
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [onClose, onNavigate, prev, next]);
 
-  const reviewed = formatReviewed(place.reviewed);
+  // The day Isa went: when her photo was taken, or else when she submitted the review
+  const reviewed = formatReviewed(place.visited || place.reviewed);
 
   return (
     <article

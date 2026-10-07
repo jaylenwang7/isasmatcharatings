@@ -20,6 +20,7 @@ CACHE_DIR = Path('.cache')
 IMAGE_CACHE_DIR = CACHE_DIR / 'images'
 COORDINATES_CACHE_PATH = CACHE_DIR / 'coordinates.json'
 COUNTRIES_CACHE_PATH = CACHE_DIR / 'countries.json'
+PHOTO_DATES_CACHE_PATH = CACHE_DIR / 'photo_dates.json'
 
 # Longest edge of published photos; enough for the largest (600px tall) view on 2x screens
 MAX_IMAGE_SIZE = 1600
@@ -28,9 +29,29 @@ THUMB_SIZE = 480
 
 VALID_TIERS = {'S', 'A', 'B', 'C', 'D', 'F'}
 
+# The sheet's columns, by exact header text. Renaming a form question renames its column, so
+# check for them all: without the required ones no review can be read
+REQUIRED_COLUMNS = ['Place Name', 'Tier Rating']
+OPTIONAL_COLUMNS = [
+    'Timestamp',
+    'Add a plus (e.g., B+)',
+    'What did you order?',
+    'Notes',
+    'Upload a picture!',
+    'Lat/Long from Google Maps',
+    'Address (copied from Google Maps)',
+]
+
+# Fields that are almost never empty, so a sudden run of empty ones means a renamed column
+USUALLY_FILLED = {'ordered': 'What did you order?', 'notes': 'Notes', 'imagePath': 'Upload a picture!'}
+
 # Neighborhoods and suburbs to file under their metro area in the site's city filter
 METRO_AREAS = {
     'Brooklyn': 'New York',
+    'Long Island City': 'New York',
+    'Astoria': 'New York',
+    'Flushing': 'New York',
+    'Bronx': 'New York',
     'Jamaica Plain': 'Boston',
     'Bellevue': 'Seattle',
     'Redmond': 'Seattle',
@@ -169,16 +190,8 @@ def parse_coordinates(coord_string: str) -> Optional[Tuple[float, float]]:
             except ValueError:
                 pass
 
-        # Case 2: Decimal degrees with directions (37.7749° N, 122.4194° W)
-        decimal_pattern = r'(-?\d+\.?\d*)\s*°?\s*([NS])?[\s,]*(-?\d+\.?\d*)\s*°?\s*([WE])?'
-        match = re.search(decimal_pattern, coord_string)
-        if match:
-            lat, ns, lng, ew = match.groups()
-            lat = float(lat) * (-1 if ns == 'S' else 1)
-            lng = float(lng) * (-1 if ew == 'W' else 1)
-            return lat, lng
-
-        # Case 3: Degrees, minutes, seconds (37°46'29.7"N 122°25'09.9"W)
+        # Case 2: Degrees, minutes, seconds (37°46'29.7"N 122°25'09.9"W). Checked before
+        # case 3, whose pattern would also match the degrees and minutes and misread them
         dms_pattern = r'''
             (\d+)°                   # Degrees
             (\d+)'                   # Minutes
@@ -197,6 +210,15 @@ def parse_coordinates(coord_string: str) -> Optional[Tuple[float, float]]:
             lng = float(lng_d) + float(lng_m)/60 + float(lng_s)/3600
             lat *= -1 if ns == 'S' else 1
             lng *= -1 if ew == 'W' else 1
+            return lat, lng
+
+        # Case 3: Decimal degrees with directions (37.7749° N, 122.4194° W)
+        decimal_pattern = r'(-?\d+\.?\d*)\s*°?\s*([NS])?[\s,]*(-?\d+\.?\d*)\s*°?\s*([WE])?'
+        match = re.search(decimal_pattern, coord_string)
+        if match:
+            lat, ns, lng, ew = match.groups()
+            lat = float(lat) * (-1 if ns == 'S' else 1)
+            lng = float(lng) * (-1 if ew == 'W' else 1)
             return lat, lng
     except:
         return None
@@ -323,6 +345,46 @@ def lookup_country(lat: float, lng: float, cache: Dict) -> Optional[str]:
     cache[key] = country
     return country
 
+def parse_photo_date(value: str) -> Optional[str]:
+    """
+    Turn a photo's capture time as Drive reports it from EXIF ('2024:11:18 14:03:22', or ISO
+    '2024-11-18T14:03:22Z') into an ISO date. Cameras record local time, so the date is the day
+    it was taken where it was taken
+    """
+    match = re.match(r'(\d{4})[:-](\d{2})[:-](\d{2})', (value or '').strip())
+    if not match:
+        return None
+    try:
+        return datetime(*map(int, match.groups())).date().isoformat()
+    except ValueError:
+        # Cameras without a set clock write "0000:00:00"
+        return None
+
+def photo_taken_date(service, file_id: str, cache: Dict) -> Optional[str]:
+    """
+    Ask Drive when a photo was taken (from its EXIF), cached by file ID. Works for photos whose
+    resized copy is cached too, since it reads Drive's metadata rather than the file
+    """
+    if file_id in cache:
+        return cache[file_id]
+    try:
+        metadata = service.files().get(fileId=file_id, fields='imageMediaMetadata(time)').execute()
+        taken = parse_photo_date(metadata.get('imageMediaMetadata', {}).get('time', ''))
+    except Exception as e:
+        print(f"Couldn't read when photo {file_id} was taken: {str(e)}")
+        return None
+    cache[file_id] = taken
+    return taken
+
+def visit_date(photo_date: Optional[str], reviewed: Optional[str]) -> Optional[str]:
+    """
+    The day Isa went: when the photo was taken, unless that's after the review was submitted
+    (a wrong camera clock), else the day she submitted the review
+    """
+    if photo_date and (not reviewed or photo_date <= reviewed):
+        return photo_date
+    return reviewed
+
 def parse_timestamp(value: str) -> Optional[str]:
     """
     Turn the form's Timestamp cell (e.g. '10/5/2026 14:03:22') into an ISO date
@@ -332,18 +394,56 @@ def parse_timestamp(value: str) -> Optional[str]:
     except ValueError:
         return None
 
-def report_skipped_rows(errors: List[str]):
+def parse_tier(tier_cell: str, plus_cell: str) -> str:
     """
-    Surface skipped rows in the GitHub Actions UI, so they aren't buried in the log
+    Combine the tier and plus columns into a grade like 'A+'. Accepts 'A+' typed in the tier
+    column too. The site only knows the six tiers, so anything else raises ValueError
     """
-    for error in errors:
-        print(f"::warning title=Skipped a review::{error}")
+    tier = tier_cell.strip().upper()
+    is_plus = tier.endswith('+') or '+' in plus_cell
+    tier = tier.rstrip('+')
+    if tier not in VALID_TIERS:
+        raise ValueError(f"Unknown tier rating '{tier}'")
+    return tier + '+' if is_plus else tier
+
+def check_columns(headers: List[str]) -> Tuple[List[str], List[str]]:
+    """
+    Return the (required, optional) columns missing from the sheet's header row
+    """
+    present = {header.strip() for header in headers}
+    return (
+        [column for column in REQUIRED_COLUMNS if column not in present],
+        [column for column in OPTIONAL_COLUMNS if column not in present],
+    )
+
+def find_empty_fields(places: List[Dict]) -> List[str]:
+    """
+    Describe fields that are empty on most reviews, which usually means their column was renamed
+    """
+    if len(places) < 5:
+        return []
+    problems = []
+    for field, column in USUALLY_FILLED.items():
+        empty = sum(1 for place in places if not place.get(field))
+        if empty / len(places) >= 0.8:
+            problems.append(f"{empty} of {len(places)} reviews have no '{column}'. Was that form question renamed?")
+    return problems
+
+def report_warnings(title: str, heading: str, messages: List[str]):
+    """
+    Surface problems in the GitHub Actions UI and run summary, so they aren't buried in the log
+    """
+    for message in messages:
+        print(f"::warning title={title}::{message}")
 
     summary_path = os.getenv('GITHUB_STEP_SUMMARY')
     if summary_path:
         with open(summary_path, 'a', encoding='utf-8') as f:
-            f.write("### Reviews skipped (not on the site)\n\n")
-            f.write(''.join(f"- {error}\n" for error in errors))
+            f.write(f"### {heading}\n\n")
+            f.write(''.join(f"- {message}\n" for message in messages))
+
+def report_skipped_rows(errors: List[str]):
+    report_warnings('Skipped a review', 'Reviews skipped (not on the site)', errors)
 
 def fetch_and_process_data():
     """
@@ -352,6 +452,7 @@ def fetch_and_process_data():
     # Load the geocoding caches
     coordinates_cache = load_cache(COORDINATES_CACHE_PATH)
     countries_cache = load_cache(COUNTRIES_CACHE_PATH)
+    photo_dates_cache = load_cache(PHOTO_DATES_CACHE_PATH)
     
     # Set up Google Sheets and Drive authentication
     scopes = [
@@ -370,7 +471,17 @@ def fetch_and_process_data():
 
     # Open the spreadsheet
     sheet = sheets_client.open_by_key(os.getenv('SHEET_ID')).sheet1
-    
+
+    # Stop before publishing if a renamed form question took a required column with it; the
+    # live site keeps its last good version
+    missing_required, missing_optional = check_columns(sheet.row_values(1))
+    if missing_required:
+        raise ValueError(f"The sheet has no {', '.join(repr(c) for c in missing_required)} column. Was a form question renamed?")
+    if missing_optional:
+        report_warnings('Missing sheet column', 'Sheet columns not found (those fields are empty on the site)', [
+            f"No '{column}' column. Was that form question renamed?" for column in missing_optional
+        ])
+
     # Get all records
     records = sheet.get_all_records()
     processed_places = []
@@ -378,6 +489,7 @@ def fetch_and_process_data():
     
     # Track which images we've already downloaded
     processed_images = set()
+    photos_dated = 0
     address_column = 'Address (copied from Google Maps)'
     
     for idx, record in enumerate(records):
@@ -415,18 +527,11 @@ def fetch_and_process_data():
 
             lat, lng = coordinates
 
-            # The site crashes on an unknown tier, so reject it here. Accept "A+" in the tier
-            # column as well as a separate plus column
-            tier_rating = get_field(record, 'Tier Rating').upper()
-            is_plus = tier_rating.endswith('+') or '+' in get_field(record, 'Add a plus (e.g., B+)')
-            tier_rating = tier_rating.rstrip('+')
-            if tier_rating not in VALID_TIERS:
-                raise ValueError(f"Unknown tier rating '{tier_rating}'")
-            if is_plus:
-                tier_rating += '+'
+            tier_rating = parse_tier(get_field(record, 'Tier Rating'), get_field(record, 'Add a plus (e.g., B+)'))
 
             # Extract file ID from the image URL/ID
             image_fields = None
+            photo_date = None
             image_url = get_field(record, 'Upload a picture!')
 
             if image_url:
@@ -440,10 +545,14 @@ def fetch_and_process_data():
                         )
                         if image_fields:
                             processed_images.add(file_id)
+                            photo_date = photo_taken_date(drive_service, file_id, photo_dates_cache)
                 else:
                     print(f"Could not extract valid file ID from URL for {place_name}: {image_url}")
 
             city = (parse_city(address) if address else None) or lookup_country(lat, lng, countries_cache)
+            reviewed = parse_timestamp(get_field(record, 'Timestamp'))
+            if photo_date:
+                photos_dated += 1
 
             processed_place = {
                 'id': idx,
@@ -456,7 +565,8 @@ def fetch_and_process_data():
                 'lat': lat,
                 'lng': lng,
                 'city': city,
-                'reviewed': parse_timestamp(get_field(record, 'Timestamp')),
+                'reviewed': reviewed,
+                'visited': visit_date(photo_date, reviewed),
                 'lastUpdated': datetime.now().isoformat(),
             }
 
@@ -476,12 +586,17 @@ def fetch_and_process_data():
     # Save the updated geocoding caches
     save_cache(COORDINATES_CACHE_PATH, coordinates_cache)
     save_cache(COUNTRIES_CACHE_PATH, countries_cache)
+    save_cache(PHOTO_DATES_CACHE_PATH, photo_dates_cache)
 
     if errors:
         print("\nProcessing completed with errors:")
         for error in errors:
             print(f"- {error}")
         report_skipped_rows(errors)
+
+    empty_fields = find_empty_fields(processed_places)
+    if empty_fields:
+        report_warnings('Mostly empty field', 'Fields empty on most reviews', empty_fields)
 
     # Save to public folder instead of src
     output_path = Path('public/data/places.json')
@@ -497,7 +612,7 @@ def fetch_and_process_data():
         raise
     
     print(f"\nProcessed {len(processed_places)} places successfully")
-    print(f"Downloaded {len(processed_images)} images")
+    print(f"Downloaded {len(processed_images)} images, {photos_dated} with the date they were taken")
     print(f"Cached {len(coordinates_cache)} coordinates")
     print(f"Skipped {len(errors)} places due to errors")
 
