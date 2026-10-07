@@ -237,6 +237,17 @@ def strip_unit(address: str) -> str:
         flags=re.IGNORECASE
     )
 
+def drop_us_city(address: str) -> str:
+    """
+    Remove the city from a US address ("101 Edgewood Ave, Pittsburgh, PA 15218" becomes
+    "101 Edgewood Ave, PA 15218"). Google Maps writes the postal city, which in places like
+    Pittsburgh's suburbs isn't the borough OpenStreetMap files the building under; the ZIP is enough
+    """
+    parts = [part.strip() for part in address.split(',')]
+    if len(parts) >= 3 and re.fullmatch(r'[A-Z]{2} \d{5}(-\d{4})?', parts[-1]):
+        return ', '.join(parts[:-2] + parts[-1:])
+    return address
+
 def geocode_address(address: str, cache: Dict) -> Optional[Tuple[float, float]]:
     """
     Geocode an address using Nominatim, with caching
@@ -245,10 +256,11 @@ def geocode_address(address: str, cache: Dict) -> Optional[Tuple[float, float]]:
     if address in cache:
         return cache[address]['lat'], cache[address]['lng']
 
-    # If the full address finds nothing, retry without the suite/unit
+    # If the full address finds nothing, retry without the suite/unit, then without the city
     queries = [address]
-    if strip_unit(address) != address:
-        queries.append(strip_unit(address))
+    for query in (strip_unit(address), drop_us_city(strip_unit(address))):
+        if query not in queries:
+            queries.append(query)
 
     for query in queries:
         try:

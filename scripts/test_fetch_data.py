@@ -45,6 +45,18 @@ def test_strip_unit(address, stripped):
     assert fd.strip_unit(address) == stripped
 
 
+@pytest.mark.parametrize('address, without_city', [
+    ('101 Edgewood Ave, Pittsburgh, PA 15218', '101 Edgewood Ave, PA 15218'),
+    ('Wean Hall, Hamerschlag Dr, Pittsburgh, PA 15213', 'Wean Hall, Hamerschlag Dr, PA 15213'),
+    ('1234 Main St, Austin, TX 78701-1234', '1234 Main St, TX 78701-1234'),
+    # Only US addresses with a state and ZIP
+    ('Sturegatan 8, 114 35 Stockholm, Sweden', 'Sturegatan 8, 114 35 Stockholm, Sweden'),
+    ('Pittsburgh, PA 15213', 'Pittsburgh, PA 15213'),
+])
+def test_drop_us_city(address, without_city):
+    assert fd.drop_us_city(address) == without_city
+
+
 @pytest.mark.parametrize('cells, grade', [
     (('A', ''), 'A'),
     (('a', ''), 'A'),
