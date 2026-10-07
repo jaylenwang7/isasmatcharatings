@@ -1,0 +1,19 @@
+name: Check Live Site
+on:
+  schedule:
+    - cron: '0 12 * * *'  # Daily at noon UTC, well after the nightly rebuild
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Confirms the deployed site serves its reviews and every photo they point to. A failed run makes
+# GitHub email whoever last changed the schedule above, which is how an outage gets noticed
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check the live site
+        run: python3 scripts/check_live_site.py

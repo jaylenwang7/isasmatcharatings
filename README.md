@@ -47,6 +47,19 @@ The workflow needs two repository secrets:
 - `GOOGLE_SHEETS_CREDENTIALS`: the JSON key of a Google service account that the sheet and the photo upload folder are shared with.
 - `SHEET_ID`: the ID of the response sheet.
 
+## Tests and checks
+
+Every deploy runs these first, and a failure stops the deploy, leaving the live site as it was:
+
+- `pytest scripts` tests the data pipeline's parsing (cities, tiers, timestamps, coordinates, photo resizing). Install with `pip install -r scripts/requirements-dev.txt`.
+- `npm test` tests the site's data handling, links, and notes formatting.
+- `npm run build` fails if the JavaScript grows past its size budget (`scripts/check-bundle-size.js`).
+
+`fetch_data.py` also stops if the sheet loses its `Place Name` or `Tier Rating` column, and warns in the run summary if another column is missing or a field is suddenly empty on most reviews, which usually means a form question was renamed.
+
+`.github/workflows/check-live-site.yml` runs `scripts/check_live_site.py` daily, checking that the live site serves its reviews and every photo; a failed run emails you.
+Run it yourself any time with `python3 scripts/check_live_site.py`.
+
 ## Local development
 
 ```sh

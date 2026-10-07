@@ -6,3 +6,4 @@ credentials.json
 .cache/
 __pycache__/
 CLAUDE.md
+.pytest_cache/
