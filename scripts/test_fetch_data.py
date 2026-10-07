@@ -78,15 +78,26 @@ def test_parse_photo_date():
     assert fd.parse_photo_date(None) is None
 
 
+def test_parse_entered_date():
+    assert fd.parse_entered_date('10/5/2026') == '2026-10-05'
+    assert fd.parse_entered_date('2026-10-05') == '2026-10-05'
+    assert fd.parse_entered_date('10/5/26') == '2026-10-05'
+    assert fd.parse_entered_date(' 1/9/2025 ') == '2025-01-09'
+    assert fd.parse_entered_date('') is None
+    assert fd.parse_entered_date('last Tuesday') is None
+
+
 def test_visit_date():
-    # The photo's date wins, since Isa often reviews days after going
-    assert fd.visit_date('2025-01-02', '2025-01-09') == ('2025-01-02', 'photo')
-    assert fd.visit_date('2025-01-09', '2025-01-09') == ('2025-01-09', 'photo')
-    # A photo "taken" after the review was submitted has a wrong clock
-    assert fd.visit_date('2031-01-01', '2025-01-09') == ('2025-01-09', 'review')
-    assert fd.visit_date(None, '2025-01-09') == ('2025-01-09', 'review')
-    assert fd.visit_date('2025-01-02', None) == ('2025-01-02', 'photo')
-    assert fd.visit_date(None, None) == (None, 'review')
+    # A date Isa entered wins, then the photo's, since she often reviews days after going
+    assert fd.visit_date('2025-01-01', '2025-01-02', '2025-01-09') == ('2025-01-01', 'entered')
+    assert fd.visit_date(None, '2025-01-02', '2025-01-09') == ('2025-01-02', 'photo')
+    assert fd.visit_date(None, '2025-01-09', '2025-01-09') == ('2025-01-09', 'photo')
+    # A date after the review was submitted is a typo or a wrong camera clock
+    assert fd.visit_date('2031-01-01', '2025-01-02', '2025-01-09') == ('2025-01-02', 'photo')
+    assert fd.visit_date(None, '2031-01-01', '2025-01-09') == ('2025-01-09', 'review')
+    assert fd.visit_date(None, None, '2025-01-09') == ('2025-01-09', 'review')
+    assert fd.visit_date(None, '2025-01-02', None) == ('2025-01-02', 'photo')
+    assert fd.visit_date(None, None, None) == (None, 'review')
 
 
 def test_describe_photo_date():

@@ -40,6 +40,7 @@ OPTIONAL_COLUMNS = [
     'Upload a picture!',
     'Lat/Long from Google Maps',
     'Address (copied from Google Maps)',
+    'When did you go?',
 ]
 
 # Fields that are almost never empty, so a sudden run of empty ones means a renamed column
@@ -376,13 +377,28 @@ def photo_taken_date(service, file_id: str, cache: Dict) -> Optional[str]:
     cache[file_id] = taken
     return taken
 
-def visit_date(photo_date: Optional[str], reviewed: Optional[str]) -> Tuple[Optional[str], str]:
+def parse_entered_date(value: str) -> Optional[str]:
     """
-    The day Isa went and where that came from: when the photo was taken ('photo'), unless that's
-    after the review was submitted (a wrong camera clock), else the day she submitted it ('review')
+    Turn the form's "When did you go?" answer into an ISO date. The sheet shows dates like
+    '10/5/2026', and someone typing into the sheet might write '2026-10-05' or '10/5/26'
     """
-    if photo_date and (not reviewed or photo_date <= reviewed):
-        return photo_date, 'photo'
+    value = (value or '').strip()
+    for pattern in ('%m/%d/%Y', '%Y-%m-%d', '%m/%d/%y'):
+        try:
+            return datetime.strptime(value, pattern).date().isoformat()
+        except ValueError:
+            pass
+    return None
+
+def visit_date(entered: Optional[str], photo_date: Optional[str], reviewed: Optional[str]) -> Tuple[Optional[str], str]:
+    """
+    The day Isa went and where that came from: the date she entered on the form ('entered'), else
+    when the photo was taken ('photo'), else the day she submitted the review ('review'). A date
+    after the submission can't be right (a typo or a wrong camera clock), so it's skipped
+    """
+    for date, source in ((entered, 'entered'), (photo_date, 'photo')):
+        if date and (not reviewed or date <= reviewed):
+            return date, source
     return reviewed, 'review'
 
 def describe_photo_date(photo_date: Optional[str], reviewed: Optional[str]) -> str:
@@ -390,20 +406,22 @@ def describe_photo_date(photo_date: Optional[str], reviewed: Optional[str]) -> s
     One line for the run log about a review's photo date, so each receipt's date can be checked
     """
     if not photo_date:
-        return 'no capture date in its metadata, so the receipt shows the submission date'
+        return 'no capture date in its metadata'
     if reviewed and photo_date > reviewed:
         return f'taken {photo_date}, after the review was submitted ({reviewed}), so that date is ignored'
     return f'taken {photo_date}'
 
-def report_undated_photos(names: List[str]):
+def report_undated_reviews(names: List[str]):
     """
-    List photos without a capture date in the run summary. Not a warning: it's normal for photos
-    that went through a messaging app or a screenshot
+    List reviews with no visit date but the submission date: no date entered on the form and no
+    capture date in the photo. Not a warning: it's normal for photos that went through a
+    messaging app or a screenshot, and filling in "When did you go?" in the sheet fixes it
     """
     summary_path = os.getenv('GITHUB_STEP_SUMMARY')
     if names and summary_path:
         with open(summary_path, 'a', encoding='utf-8') as f:
-            f.write("### Photos without a capture date (their receipts show the submission date)\n\n")
+            f.write("### Reviews dated by when they were submitted\n\n")
+            f.write("No date in \"When did you go?\" and no capture date in the photo. Fill in the sheet's \"When did you go?\" column to fix one.\n\n")
             f.write(''.join(f"- {name}\n" for name in names))
 
 def parse_timestamp(value: str) -> Optional[str]:
@@ -511,7 +529,7 @@ def fetch_and_process_data():
     # Track which images we've already downloaded
     processed_images = set()
     photos_dated = 0
-    undated_photos = []
+    dated_by_submission = []
     address_column = 'Address (copied from Google Maps)'
     
     for idx, record in enumerate(records):
@@ -573,13 +591,19 @@ def fetch_and_process_data():
 
             city = (parse_city(address) if address else None) or lookup_country(lat, lng, countries_cache)
             reviewed = parse_timestamp(get_field(record, 'Timestamp'))
-            visited, visited_from = visit_date(photo_date, reviewed)
+            entered_cell = get_field(record, 'When did you go?')
+            entered = parse_entered_date(entered_cell)
+            if entered_cell and not entered:
+                print(f"Couldn't read the date '{entered_cell}' Isa entered for {place_name}")
+            visited, visited_from = visit_date(entered, photo_date, reviewed)
             if image_fields:
                 print(f"Photo for {place_name}: {describe_photo_date(photo_date, reviewed)}")
                 if photo_date:
                     photos_dated += 1
-                else:
-                    undated_photos.append(place_name)
+            if visited_from == 'review':
+                dated_by_submission.append(place_name)
+            if entered and visited_from != 'entered':
+                print(f"Ignored the date entered for {place_name} ({entered}): it's after the review was submitted")
 
             processed_place = {
                 'id': idx,
@@ -594,7 +618,8 @@ def fetch_and_process_data():
                 'city': city,
                 'reviewed': reviewed,
                 'visited': visited,
-                # 'photo' when the date is when the photo was taken, 'review' when it's the submission date
+                # Where the date came from: 'entered' on the form, 'photo' (when it was taken), or 'review'
+                # (the submission date)
                 'visitedFrom': visited_from,
                 'lastUpdated': datetime.now().isoformat(),
             }
@@ -623,7 +648,7 @@ def fetch_and_process_data():
             print(f"- {error}")
         report_skipped_rows(errors)
 
-    report_undated_photos(undated_photos)
+    report_undated_reviews(dated_by_submission)
 
     empty_fields = find_empty_fields(processed_places)
     if empty_fields:
