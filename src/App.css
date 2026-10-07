@@ -1,0 +1,111 @@
+/* Wide screens: the masthead, filters, and tier list on the left, beside a full-height map
+   that stays put. Phones: the tier list or the map, one at a time */
+.page {
+  display: grid;
+  grid-template-areas:
+    'masthead panel'
+    'toolbar panel'
+    'board panel';
+  grid-template-rows: auto auto 1fr;
+  grid-template-columns: minmax(0, 1fr) var(--panel-w);
+  column-gap: 24px;
+  max-width: var(--page-w);
+  margin: 0 auto;
+  padding: 0 var(--gutter);
+}
+
+.page__masthead {
+  grid-area: masthead;
+}
+
+.page__board {
+  grid-area: board;
+  padding: 18px 0 64px;
+}
+
+.page__panel {
+  grid-area: panel;
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: 100dvh;
+  padding: 16px 0;
+}
+
+/* The map sits in a paper mat, like the photos */
+.page__map {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+  border: 6px solid var(--paper);
+  border-radius: calc(var(--radius) + 6px);
+  background: var(--sea);
+  box-shadow:
+    0 0 0 1px var(--line-strong),
+    var(--shadow-raised);
+}
+
+.message {
+  padding: 32px 24px;
+  border-radius: var(--radius);
+  background: var(--paper);
+}
+
+.message p {
+  max-width: 50ch;
+  margin: 0 0 16px;
+}
+
+.message__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.message button {
+  height: 38px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--ink);
+  font: 500 15px var(--font-text);
+  color: var(--milk);
+  cursor: pointer;
+}
+
+.message button.message__secondary {
+  border: 1px solid var(--line-strong);
+  background: var(--paper);
+  color: var(--ink);
+}
+
+@media (max-width: 959px) {
+  .page {
+    grid-template-areas: 'masthead' 'toolbar' 'board' 'panel';
+    grid-template-rows: auto;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .page__board {
+    padding: 12px 0 96px;
+  }
+
+  .page--list .page__panel,
+  .page--map .page__board,
+  .page--map .page__masthead {
+    display: none;
+  }
+
+  .page__panel {
+    position: relative;
+    height: calc(100dvh - var(--toolbar-h));
+    margin: 0 calc(-1 * var(--gutter));
+    padding: 0;
+  }
+
+  .page__map {
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+}

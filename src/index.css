@@ -1,39 +1,164 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* Design tokens. Fonts load in public/index.html */
+:root {
+  color-scheme: light;
 
-@keyframes slideIn {
+  --milk: #f3f5ec;
+  --paper: #ffffff;
+  --ink: #1f2b1d;
+  --ink-soft: #586453;
+  --ink-faint: #848f7e;
+  --line: #e0e5d6;
+  --line-strong: #cfd6c3;
+  /* Isa's pen: strawberry, for the strawberry matcha lattes at the top of the list */
+  --pen: #df4f68;
+  --rule-color: #dbe6d1;
+  --bridge: #e3a81b;
+  --sea: #cfd4ca;
+  --matcha-stain: #7f9a3e;
+  --note-paper: #fffefa;
+
+  --font-display: 'Dela Gothic One', 'Arial Black', sans-serif;
+  --font-text: 'Zen Kaku Gothic New', system-ui, sans-serif;
+  --font-hand: 'Nanum Pen Script', 'Bradley Hand', cursive;
+
+  /* Two corner radii: paper things are nearly square, controls are softer */
+  --radius-paper: 2px;
+  --radius: 8px;
+
+  --shadow-raised: 0 1px 2px rgb(32 48 28 / 0.12);
+  --shadow-float: 0 6px 18px rgb(32 48 28 / 0.18);
+  --shadow-paper:
+    0 0 0 1px rgb(32 48 28 / 0.06),
+    0 10px 24px -8px rgb(32 48 28 / 0.35);
+  /* Pins get a faint ink edge so the pale tiers still stand out on the map */
+  --shadow-pin:
+    0 0 0 1px rgb(31 43 29 / 0.28),
+    0 1px 4px rgb(32 48 28 / 0.35);
+
+  --page-w: 1480px;
+  --gutter: 24px;
+  --panel-w: clamp(400px, 40vw, 620px);
+  --label-w: 172px;
+  --tile-w: 104px;
+}
+
+@media (max-width: 959px) {
+  :root {
+    --gutter: 16px;
+    --toolbar-h: 57px;
+    --tile-w: 92px;
+  }
+}
+
+/* Tier colors fade like matcha does: vivid ceremonial green at the top, oxidized brown at the bottom.
+   Each tier sits about 10 points of lightness from its neighbors, so they stay distinct for
+   color-blind visitors too, and text on each clears 4.5:1 contrast */
+[data-tier='S'] {
+  --tier: #256b32;
+  --on-tier: #ffffff;
+  --tier-wash: #e1eddb;
+  --tier-tape: rgb(37 107 50 / 0.42);
+}
+
+[data-tier='A'] {
+  --tier: #3f8530;
+  --on-tier: #ffffff;
+  --tier-wash: #e5f0dc;
+  --tier-tape: rgb(63 133 48 / 0.42);
+}
+
+[data-tier='B'] {
+  --tier: #a3b940;
+  --on-tier: #1f2b1d;
+  --tier-wash: #eff4da;
+  --tier-tape: rgb(163 185 64 / 0.5);
+}
+
+[data-tier='C'] {
+  --tier: #e3d076;
+  --on-tier: #1f2b1d;
+  --tier-wash: #f8f2d9;
+  --tier-tape: rgb(227 208 118 / 0.6);
+}
+
+[data-tier='D'] {
+  --tier: #bb884b;
+  --on-tier: #1f2b1d;
+  --tier-wash: #f3e8da;
+  --tier-tape: rgb(187 136 75 / 0.5);
+}
+
+[data-tier='F'] {
+  --tier: #4a3c34;
+  --on-tier: #ffffff;
+  --tier-wash: #ebe6e1;
+  --tier-tape: rgb(74 60 52 / 0.42);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* Keep room for the scrollbar, so the layout doesn't shift when a search empties the list */
+html {
+  scrollbar-gutter: stable;
+}
+
+body {
+  margin: 0;
+  background: var(--milk);
+  color: var(--ink);
+  font-family: var(--font-text);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+:focus-visible {
+  outline: 2px solid var(--pen);
+  outline-offset: 2px;
+}
+
+/* Strokes in Isa's pen (PenMarks.js) draw themselves on when they appear */
+.pen-mark {
+  overflow: visible;
+  pointer-events: none;
+}
+
+.pen-mark path {
+  fill: none;
+  stroke: var(--pen);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  animation: pen-draw 550ms cubic-bezier(0.55, 0.1, 0.35, 1) both;
+}
+
+@keyframes pen-draw {
   from {
-    opacity: 0;
-    transform: translateY(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
+    stroke-dashoffset: 1;
   }
 }
 
-.animate-slide-in {
-  animation: slideIn 0.5s ease-out;
-}
-
-@keyframes sparkle {
-  0%, 100% { opacity: 0; transform: scale(0); }
-  50% { opacity: 1; transform: scale(1); }
-}
-
-.animate-sparkle {
-  animation: sparkle 2s ease-in-out infinite;
-}
-
-@layer base {
-  .prose ul {
-    list-style-type: disc;
-    padding-left: 1.5rem;
-    margin-top: 0.5rem;
-  }
-
-  .prose li {
-    margin-bottom: 0.25rem;
+@media (prefers-reduced-motion: reduce) {
+  .pen-mark path {
+    animation: none;
   }
 }

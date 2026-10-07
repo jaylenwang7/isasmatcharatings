@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <style>
+    .ink { stroke: #1f2b1d; }
+    @media (prefers-color-scheme: dark) { .ink { stroke: #f3f5ec; } }
+  </style>
+  <clipPath id="cup"><path d="M12 22h40l-5 33a4 4 0 0 1-4 3.5H21a4 4 0 0 1-4-3.5z"/></clipPath>
+  <g clip-path="url(#cup)">
+    <path fill="#fbfaf4" d="M0 20h64v44H0z"/>
+    <path fill="#9ab955" d="M0 26c8-2 14 2 22 0s16-3 24 0 12 1 18-1v15c-6 2-12-1-18 1s-14 3-22 0-16-1-24 1z"/>
+    <path fill="#ec8a9b" d="M0 48c7-2 13 2 20 0s15-3 23-1 14 2 21 0v17H0z"/>
+  </g>
+  <path class="ink" stroke-width="5.5" stroke-linecap="round" d="M44 4l-8 34"/>
+  <path stroke="#df4f68" stroke-width="2.8" stroke-linecap="round" d="M44 4l-8 34"/>
+  <path class="ink" fill="none" stroke-width="3.2" stroke-linejoin="round" d="M12 22h40l-5 33a4 4 0 0 1-4 3.5H21a4 4 0 0 1-4-3.5z"/>
+  <path class="ink" fill="none" stroke-width="3.2" stroke-linecap="round" d="M9 22h46"/>
+</svg>

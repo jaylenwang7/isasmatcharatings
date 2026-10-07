@@ -54,5 +54,9 @@ npm ci
 npm start
 ```
 
-`public/data/places.json` is empty in the repository.
-To see real reviews locally, copy it from https://jaylenwang.com/isasmatcharatings/data/places.json; photos won't load, since they're only generated in CI.
+`public/data/places.json` is empty in the repository, so the page shows no reviews.
+To develop against the live reviews and photos, point the app at the live data:
+
+```sh
+REACT_APP_DATA_URL=https://jaylenwang.com/isasmatcharatings/data/places.json npm start
+```

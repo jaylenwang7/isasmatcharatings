@@ -1,0 +1,182 @@
+.board {
+  display: grid;
+  gap: 6px;
+}
+
+.tier {
+  display: grid;
+  grid-template-columns: var(--label-w) minmax(0, 1fr);
+  background: var(--paper);
+  border-radius: var(--radius);
+  overflow: clip;
+}
+
+.tier__label {
+  background: var(--tier);
+  color: var(--on-tier);
+}
+
+/* The label stays in view while scrolling through a long tier */
+.tier__label-inner {
+  position: sticky;
+  top: 12px;
+  padding: 16px 16px 20px 18px;
+}
+
+.tier__letter {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 52px;
+  font-weight: 400;
+  line-height: 1;
+}
+
+/* What the tier means, in Isa's words and handwriting */
+.tier__description {
+  margin: 10px 0 0;
+  font-family: var(--font-hand);
+  font-size: 22px;
+  line-height: 1.02;
+  text-wrap: pretty;
+}
+
+.tier__body {
+  padding: 16px 18px 20px;
+}
+
+.tier__empty {
+  margin: 0;
+  font-family: var(--font-hand);
+  font-size: 22px;
+  line-height: 1.2;
+  color: var(--ink-faint);
+}
+
+.tier__places {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--tile-w), 1fr));
+  gap: 16px 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tile {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+  border-radius: var(--radius-paper);
+}
+
+/* Every photo is cropped to the same 3:4 box, whatever its shape */
+.tile__photo {
+  position: relative;
+  display: block;
+  aspect-ratio: 3 / 4;
+  border-radius: var(--radius-paper);
+  background: var(--tier-wash);
+}
+
+.tile__photo img,
+.tile__no-photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
+}
+
+.tile__no-photo {
+  inset: 18% 22%;
+  width: 56%;
+  height: 64%;
+  transform: rotate(6deg);
+}
+
+.tile[aria-current] .tile__photo {
+  outline: 3px solid var(--pen);
+  outline-offset: 2px;
+}
+
+.tile--placeholder .tile__photo {
+  background: var(--line);
+  opacity: 0.6;
+}
+
+/* A plus grade is written out in Isa's pen on a scrap of paper stuck to the photo's corner */
+.tile__grade {
+  position: absolute;
+  top: -9px;
+  right: -9px;
+  padding: 3px 7px 1px 6px;
+  border-radius: var(--radius-paper);
+  background: var(--paper);
+  box-shadow: 0 1px 3px rgb(32 48 28 / 0.28);
+  font: 26px/1 var(--font-hand);
+  color: var(--pen);
+  transform: rotate(-7deg);
+}
+
+.tile__name {
+  display: -webkit-box;
+  margin-top: 7px;
+  overflow: hidden;
+  font-size: 13.5px;
+  font-weight: 500;
+  line-height: 1.3;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.tile__city {
+  display: block;
+  margin-top: 1px;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--ink-soft);
+}
+
+@media (hover: hover) {
+  .tile:hover .tile__name {
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+  }
+}
+
+/* Phones: the label becomes a colored band across the top of the row */
+@media (max-width: 959px) {
+  .tier {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .tier__label-inner {
+    position: static;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    padding: 10px 14px;
+  }
+
+  .tier__letter {
+    font-size: 32px;
+  }
+
+  .tier__description {
+    margin: 0;
+    font-size: 19px;
+  }
+
+  .tier__body {
+    padding: 14px 14px 18px;
+  }
+
+  .tier__places {
+    gap: 14px 10px;
+  }
+
+  .tile__grade {
+    font-size: 24px;
+  }
+}

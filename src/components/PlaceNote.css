@@ -1,0 +1,455 @@
+.note {
+  --rule: 30px;
+  --tilt: -0.8deg;
+  --pad: 24px;
+  display: flex;
+  flex-direction: column;
+  transform: rotate(var(--tilt));
+  animation: note-land 560ms cubic-bezier(0.2, 0.9, 0.25, 1) both;
+}
+
+.note:focus {
+  outline: none;
+}
+
+/* On wide screens the note lies on the lower part of the map */
+.note--panel {
+  position: absolute;
+  z-index: 1;
+  right: 20px;
+  bottom: 20px;
+  left: 20px;
+  height: 64%;
+}
+
+/* On phones it slides up over the page, or over half the map in map view */
+.note--sheet,
+.note--sheet-half {
+  --tilt: -0.4deg;
+  --pad: 20px;
+  position: fixed;
+  z-index: 50;
+  right: 10px;
+  bottom: 10px;
+  left: 10px;
+  max-height: calc(100dvh - 40px);
+}
+
+.note--sheet-half {
+  height: 56dvh;
+}
+
+@keyframes note-land {
+  from {
+    opacity: 0;
+    transform: translateY(56px) rotate(calc(var(--tilt) - 3deg));
+  }
+  65% {
+    opacity: 1;
+    transform: translateY(-3px) rotate(calc(var(--tilt) + 0.5deg));
+  }
+  to {
+    transform: translateY(0) rotate(var(--tilt));
+  }
+}
+
+/* Paper: barely warm, with a fine grain */
+.note__paper {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: var(--radius-paper);
+  background-color: var(--note-paper);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.35 0 0 0 0 0.33 0 0 0 0 0.25 0 0 0 0.09 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+  box-shadow: var(--shadow-paper);
+}
+
+.note__writing {
+  position: relative;
+  isolation: isolate;
+  margin-top: 26px;
+}
+
+.note__ring {
+  position: absolute;
+  z-index: -1;
+  top: -6px;
+  right: -74px;
+  width: 170px;
+  height: 170px;
+  color: var(--matcha-stain);
+  pointer-events: none;
+}
+
+.note__close {
+  position: absolute;
+  z-index: 2;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 50%;
+  /* A disc of paper, so the X stays clear of the writing scrolling under it */
+  background: rgb(255 254 250 / 0.92);
+  cursor: pointer;
+}
+
+.note__close svg {
+  width: 22px;
+  height: 22px;
+  stroke-width: 2.2px;
+}
+
+.note__close path {
+  stroke: var(--ink-soft);
+  animation: none;
+}
+
+.note__close:hover path {
+  stroke: var(--pen);
+}
+
+.note__scroll {
+  container-type: inline-size;
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden auto;
+  overscroll-behavior: contain;
+  padding: var(--pad);
+  scrollbar-width: thin;
+  scrollbar-color: rgb(32 48 28 / 0.22) transparent;
+}
+
+.note__scroll--more {
+  mask-image: linear-gradient(#000 calc(100% - 40px), transparent);
+}
+
+.note__scroll::-webkit-scrollbar {
+  width: 10px;
+}
+
+.note__scroll::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 10px;
+  background: rgb(32 48 28 / 0.22) padding-box;
+}
+
+/* The top of the page: photo, name, and receipt */
+.note__ticket {
+  display: grid;
+  gap: 22px;
+}
+
+.note__photo {
+  position: relative;
+  justify-self: center;
+  width: min(68%, 280px);
+  margin: 10px 0 8px;
+  transform: rotate(1.8deg);
+}
+
+.note__photo img,
+.note__no-photo {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 46vh;
+  object-fit: cover;
+  border: 7px solid #fff;
+  border-bottom-width: 26px;
+  box-shadow:
+    0 0 0 1px rgb(32 48 28 / 0.08),
+    0 3px 10px rgb(32 48 28 / 0.18);
+}
+
+.note__no-photo {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 3 / 4;
+  background: var(--tier-wash);
+}
+
+.note__no-photo svg {
+  width: 52%;
+  transform: rotate(6deg);
+}
+
+/* A strip of tape in the tier's color holds the photo on */
+.note__tape {
+  position: absolute;
+  z-index: 1;
+  top: -12px;
+  left: 50%;
+  width: 92px;
+  height: 26px;
+  background: var(--tier-tape);
+  transform: translateX(-50%) rotate(-5deg);
+  clip-path: polygon(
+    0 8%, 4% 0, 8% 10%, 12% 0, 100% 0, 96% 12%, 100% 25%, 96% 40%, 100% 55%, 96% 70%, 100% 85%, 96% 100%,
+    0 100%, 4% 88%, 0 75%, 4% 60%, 0 45%, 4% 30%
+  );
+}
+
+/* The grade is written over the photo's bottom corner */
+.note__grade {
+  position: absolute;
+  right: -30px;
+  bottom: -26px;
+  transform: rotate(-4deg);
+}
+
+.note__info {
+  padding-right: 28px;
+}
+
+.note__name {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.15;
+  text-wrap: balance;
+}
+
+.note__where {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 6px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ink-soft);
+}
+
+.note__where a,
+.note__where button {
+  display: inline-flex;
+  gap: 5px;
+  align-items: baseline;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.note__where svg {
+  flex: none;
+  align-self: center;
+}
+
+.note__where a:hover,
+.note__where button:hover {
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-color: var(--line-strong);
+  text-underline-offset: 3px;
+}
+
+/* The receipt for what Isa ordered, taped in with a torn bottom edge. The shadow sits on the
+   wrapper, since clip-path would cut off a box-shadow */
+.note__receipt {
+  position: relative;
+  max-width: 280px;
+  margin-top: 18px;
+  filter: drop-shadow(0 1px 1.5px rgb(32 48 28 / 0.2));
+  transform: rotate(-0.8deg);
+}
+
+.note__receipt-paper {
+  padding: 12px 14px 18px;
+  background: #fff;
+  clip-path: polygon(
+    0 0, 100% 0, 100% calc(100% - 5px), 97.73% 100%, 95.45% calc(100% - 5px), 93.18% 100%, 90.91% calc(100% - 5px),
+    88.64% 100%, 86.36% calc(100% - 5px), 84.09% 100%, 81.82% calc(100% - 5px), 79.55% 100%, 77.27% calc(100% - 5px),
+    75% 100%, 72.73% calc(100% - 5px), 70.45% 100%, 68.18% calc(100% - 5px), 65.91% 100%, 63.64% calc(100% - 5px),
+    61.36% 100%, 59.09% calc(100% - 5px), 56.82% 100%, 54.55% calc(100% - 5px), 52.27% 100%, 50% calc(100% - 5px),
+    47.73% 100%, 45.45% calc(100% - 5px), 43.18% 100%, 40.91% calc(100% - 5px), 38.64% 100%, 36.36% calc(100% - 5px),
+    34.09% 100%, 31.82% calc(100% - 5px), 29.55% 100%, 27.27% calc(100% - 5px), 25% 100%, 22.73% calc(100% - 5px),
+    20.45% 100%, 18.18% calc(100% - 5px), 15.91% 100%, 13.64% calc(100% - 5px), 11.36% 100%, 9.09% calc(100% - 5px),
+    6.82% 100%, 4.55% calc(100% - 5px), 2.27% 100%, 0 calc(100% - 5px)
+  );
+}
+
+.note__receipt-tape {
+  position: absolute;
+  z-index: 1;
+  top: -9px;
+  left: 22px;
+  width: 58px;
+  height: 18px;
+  background: var(--tier-tape);
+  transform: rotate(4deg);
+  clip-path: polygon(0 10%, 5% 0, 95% 0, 100% 15%, 96% 50%, 100% 85%, 95% 100%, 5% 100%, 0 85%, 4% 50%);
+}
+
+.note__label {
+  margin: 0 0 2px;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--ink-soft);
+}
+
+.note__drink {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.note__date {
+  margin: 10px 0 0;
+  padding-top: 8px;
+  border-top: 1px dashed var(--line-strong);
+  font-size: 12.5px;
+  color: var(--ink-faint);
+}
+
+/* Isa's notes, handwritten on ruled lines */
+.notes {
+  position: relative;
+  font-family: var(--font-hand);
+  font-size: 25px;
+  line-height: var(--rule);
+  background: linear-gradient(transparent calc(var(--rule) - 1px), var(--rule-color) 0) 0 -3px / 100% var(--rule);
+}
+
+.notes p,
+.notes ul {
+  margin: 0;
+  padding: 0;
+}
+
+.notes ul {
+  list-style: none;
+}
+
+.notes li {
+  position: relative;
+  padding-left: 0.9em;
+}
+
+.notes li::before {
+  content: '-';
+  position: absolute;
+  left: 0.15em;
+}
+
+.notes em {
+  font-style: normal;
+  text-decoration: underline;
+  text-decoration-color: var(--pen);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 2px;
+}
+
+/* Browse to the neighboring reviews without closing the note */
+.note__nav {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 24px calc(-1 * var(--pad)) calc(-1 * var(--pad));
+  padding: 6px 10px;
+  border-top: 1px solid var(--line);
+}
+
+.note__nav button {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+  padding: 8px;
+  border: 0;
+  border-radius: calc(var(--radius) - 2px);
+  background: none;
+  font-family: var(--font-text);
+  color: var(--ink-soft);
+  text-align: left;
+  cursor: pointer;
+}
+
+.note__nav button:hover {
+  background: var(--milk);
+  color: var(--ink);
+}
+
+.note__nav button > span {
+  min-width: 0;
+}
+
+.note__nav svg {
+  flex: none;
+}
+
+.note__nav-next {
+  justify-content: flex-end;
+  text-align: right !important;
+}
+
+.note__nav-hint {
+  display: block;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--ink-faint);
+}
+
+.note__nav-name {
+  display: block;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.3;
+  color: var(--ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Wide notes put the photo beside the printed details */
+@container (min-width: 440px) {
+  .note__ticket {
+    grid-template-columns: 40% minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .note__photo {
+    width: auto;
+    margin: 8px 0 18px 4px;
+  }
+
+  .note__photo img,
+  .note__no-photo {
+    max-height: 340px;
+  }
+
+  .note__info {
+    padding-top: 6px;
+  }
+}
+
+.sheet-backdrop {
+  position: fixed;
+  z-index: 49;
+  inset: 0;
+  background: rgb(29 42 30 / 0.4);
+  animation: fade-in 200ms ease-out both;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .note {
+    animation: fade-in 150ms ease-out both;
+  }
+}

@@ -1,0 +1,16 @@
+.colophon {
+  max-width: 58ch;
+  padding: 32px 0 16px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--ink-soft);
+}
+
+.colophon p {
+  margin: 0;
+}
+
+.colophon .colophon__updated {
+  margin-top: 8px;
+  color: var(--ink-faint);
+}

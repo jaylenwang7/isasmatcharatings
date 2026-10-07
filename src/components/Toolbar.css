@@ -1,0 +1,182 @@
+/* Search and the city filter, under the masthead. Phones keep it stuck to the top */
+.toolbar {
+  grid-area: toolbar;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 0;
+  align-items: center;
+  /* Pull the city buttons' padding into the gutter, so their words line up with the title */
+  margin-left: -10px;
+  padding: 4px 0 16px;
+  /* A divider that starts at the content edge, not in the gutter */
+  background: linear-gradient(var(--line), var(--line)) right bottom / calc(100% - 10px) 1px no-repeat;
+}
+
+/* Cities are words, and the one showing is underlined in Isa's pen */
+.cities {
+  display: contents;
+}
+
+.city {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  gap: 5px;
+  align-items: center;
+  height: 36px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius);
+  background: none;
+  font: 500 15px var(--font-text);
+  color: var(--ink-soft);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.city svg:not(.city__circle) {
+  margin-right: 1px;
+  color: var(--bridge);
+}
+
+.city__count {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.city:hover,
+.city[aria-pressed='true'] {
+  color: var(--ink);
+}
+
+.city__mark {
+  position: absolute;
+  right: 6px;
+  bottom: 1px;
+  left: 6px;
+  width: calc(100% - 12px);
+  height: 8px;
+  stroke-width: 2.4px;
+}
+
+.search {
+  position: relative;
+  display: flex;
+  flex: 0 0 210px;
+  align-items: center;
+  min-width: 0;
+  margin: 0 14px 0 10px;
+  height: 36px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--paper);
+  color: var(--ink-faint);
+}
+
+.search > svg {
+  position: absolute;
+  left: 10px;
+  pointer-events: none;
+}
+
+.search input {
+  flex: 1;
+  width: 0;
+  min-width: 0;
+  height: 100%;
+  padding: 0 8px 0 33px;
+  border: 0;
+  border-radius: inherit;
+  background: none;
+  font: 15px var(--font-text);
+  color: var(--ink);
+}
+
+.search input::placeholder {
+  color: var(--ink-faint);
+}
+
+.search input::-webkit-search-cancel-button {
+  appearance: none;
+}
+
+.search input:focus {
+  outline: none;
+}
+
+.search:focus-within {
+  border-color: var(--ink-soft);
+}
+
+.search__clear {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  margin-right: 5px;
+  border: 0;
+  border-radius: calc(var(--radius) - 2px);
+  background: var(--milk);
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+/* Phones: one line, with the cities scrolling sideways and search behind a button */
+@media (max-width: 959px) {
+  .toolbar {
+    position: sticky;
+    z-index: 20;
+    top: 0;
+    flex-wrap: nowrap;
+    gap: 6px;
+    height: var(--toolbar-h);
+    margin: 0 calc(-1 * var(--gutter));
+    border-bottom: 1px solid var(--line);
+    padding: 0 0 0 var(--gutter);
+    background: var(--milk);
+  }
+
+  .cities {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    margin-left: 0;
+    padding: 2px 40px 2px 4px;
+    mask-image: linear-gradient(to right, #000 calc(100% - 48px), transparent);
+  }
+
+  .cities::-webkit-scrollbar {
+    display: none;
+  }
+
+  .search {
+    flex-basis: 36px;
+    margin: 0;
+    cursor: pointer;
+  }
+
+  .search input::placeholder {
+    color: transparent;
+  }
+
+  .search:focus-within,
+  .search--filled {
+    flex-basis: calc(100% - var(--gutter));
+  }
+
+  .search:focus-within input::placeholder,
+  .search--filled input::placeholder {
+    color: var(--ink-faint);
+  }
+
+  .search:focus-within + .cities,
+  .search--filled + .cities {
+    display: none;
+  }
+}
