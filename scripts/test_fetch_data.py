@@ -80,13 +80,19 @@ def test_parse_photo_date():
 
 def test_visit_date():
     # The photo's date wins, since Isa often reviews days after going
-    assert fd.visit_date('2025-01-02', '2025-01-09') == '2025-01-02'
-    assert fd.visit_date('2025-01-09', '2025-01-09') == '2025-01-09'
+    assert fd.visit_date('2025-01-02', '2025-01-09') == ('2025-01-02', 'photo')
+    assert fd.visit_date('2025-01-09', '2025-01-09') == ('2025-01-09', 'photo')
     # A photo "taken" after the review was submitted has a wrong clock
-    assert fd.visit_date('2031-01-01', '2025-01-09') == '2025-01-09'
-    assert fd.visit_date(None, '2025-01-09') == '2025-01-09'
-    assert fd.visit_date('2025-01-02', None) == '2025-01-02'
-    assert fd.visit_date(None, None) is None
+    assert fd.visit_date('2031-01-01', '2025-01-09') == ('2025-01-09', 'review')
+    assert fd.visit_date(None, '2025-01-09') == ('2025-01-09', 'review')
+    assert fd.visit_date('2025-01-02', None) == ('2025-01-02', 'photo')
+    assert fd.visit_date(None, None) == (None, 'review')
+
+
+def test_describe_photo_date():
+    assert fd.describe_photo_date('2025-01-02', '2025-01-09') == 'taken 2025-01-02'
+    assert 'no capture date' in fd.describe_photo_date(None, '2025-01-09')
+    assert 'ignored' in fd.describe_photo_date('2031-01-01', '2025-01-09')
 
 
 def test_get_field():

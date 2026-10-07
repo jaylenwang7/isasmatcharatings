@@ -376,14 +376,35 @@ def photo_taken_date(service, file_id: str, cache: Dict) -> Optional[str]:
     cache[file_id] = taken
     return taken
 
-def visit_date(photo_date: Optional[str], reviewed: Optional[str]) -> Optional[str]:
+def visit_date(photo_date: Optional[str], reviewed: Optional[str]) -> Tuple[Optional[str], str]:
     """
-    The day Isa went: when the photo was taken, unless that's after the review was submitted
-    (a wrong camera clock), else the day she submitted the review
+    The day Isa went and where that came from: when the photo was taken ('photo'), unless that's
+    after the review was submitted (a wrong camera clock), else the day she submitted it ('review')
     """
     if photo_date and (not reviewed or photo_date <= reviewed):
-        return photo_date
-    return reviewed
+        return photo_date, 'photo'
+    return reviewed, 'review'
+
+def describe_photo_date(photo_date: Optional[str], reviewed: Optional[str]) -> str:
+    """
+    One line for the run log about a review's photo date, so each receipt's date can be checked
+    """
+    if not photo_date:
+        return 'no capture date in its metadata, so the receipt shows the submission date'
+    if reviewed and photo_date > reviewed:
+        return f'taken {photo_date}, after the review was submitted ({reviewed}), so that date is ignored'
+    return f'taken {photo_date}'
+
+def report_undated_photos(names: List[str]):
+    """
+    List photos without a capture date in the run summary. Not a warning: it's normal for photos
+    that went through a messaging app or a screenshot
+    """
+    summary_path = os.getenv('GITHUB_STEP_SUMMARY')
+    if names and summary_path:
+        with open(summary_path, 'a', encoding='utf-8') as f:
+            f.write("### Photos without a capture date (their receipts show the submission date)\n\n")
+            f.write(''.join(f"- {name}\n" for name in names))
 
 def parse_timestamp(value: str) -> Optional[str]:
     """
@@ -490,6 +511,7 @@ def fetch_and_process_data():
     # Track which images we've already downloaded
     processed_images = set()
     photos_dated = 0
+    undated_photos = []
     address_column = 'Address (copied from Google Maps)'
     
     for idx, record in enumerate(records):
@@ -551,8 +573,13 @@ def fetch_and_process_data():
 
             city = (parse_city(address) if address else None) or lookup_country(lat, lng, countries_cache)
             reviewed = parse_timestamp(get_field(record, 'Timestamp'))
-            if photo_date:
-                photos_dated += 1
+            visited, visited_from = visit_date(photo_date, reviewed)
+            if image_fields:
+                print(f"Photo for {place_name}: {describe_photo_date(photo_date, reviewed)}")
+                if photo_date:
+                    photos_dated += 1
+                else:
+                    undated_photos.append(place_name)
 
             processed_place = {
                 'id': idx,
@@ -566,7 +593,9 @@ def fetch_and_process_data():
                 'lng': lng,
                 'city': city,
                 'reviewed': reviewed,
-                'visited': visit_date(photo_date, reviewed),
+                'visited': visited,
+                # 'photo' when the date is when the photo was taken, 'review' when it's the submission date
+                'visitedFrom': visited_from,
                 'lastUpdated': datetime.now().isoformat(),
             }
 
@@ -593,6 +622,8 @@ def fetch_and_process_data():
         for error in errors:
             print(f"- {error}")
         report_skipped_rows(errors)
+
+    report_undated_photos(undated_photos)
 
     empty_fields = find_empty_fields(processed_places)
     if empty_fields:
