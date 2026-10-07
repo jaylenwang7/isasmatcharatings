@@ -19,11 +19,22 @@ import time
 CACHE_DIR = Path('.cache')
 IMAGE_CACHE_DIR = CACHE_DIR / 'images'
 COORDINATES_CACHE_PATH = CACHE_DIR / 'coordinates.json'
+COUNTRIES_CACHE_PATH = CACHE_DIR / 'countries.json'
 
 # Longest edge of published photos; enough for the largest (600px tall) view on 2x screens
 MAX_IMAGE_SIZE = 1600
+# Longest edge of the tier list thumbnails, which show about 110px wide; enough for 3x screens
+THUMB_SIZE = 480
 
 VALID_TIERS = {'S', 'A', 'B', 'C', 'D', 'F'}
+
+# Neighborhoods and suburbs to file under their metro area in the site's city filter
+METRO_AREAS = {
+    'Brooklyn': 'New York',
+    'Jamaica Plain': 'Boston',
+    'Bellevue': 'Seattle',
+    'Redmond': 'Seattle',
+}
 
 def get_field(record: Dict, column: str) -> str:
     """
@@ -70,20 +81,21 @@ def extract_file_id(url: str) -> Optional[str]:
     
     return None
 
-def resize_image(source, dest: Path):
+def resize_image(source, dest: Path, max_size: int = MAX_IMAGE_SIZE, quality: int = 82) -> Tuple[int, int]:
     """
-    Shrink a full-size phone photo to a web-friendly JPEG
+    Shrink a full-size phone photo to a web-friendly JPEG, returning its new (width, height)
     """
     with Image.open(source) as img:
         # Phone photos store their rotation in EXIF, which re-encoding drops, so apply it first
         img = ImageOps.exif_transpose(img)
-        img.thumbnail((MAX_IMAGE_SIZE, MAX_IMAGE_SIZE))
-        img.convert('RGB').save(dest, 'JPEG', quality=82, optimize=True, progressive=True)
+        img.thumbnail((max_size, max_size))
+        img.convert('RGB').save(dest, 'JPEG', quality=quality, optimize=True, progressive=True)
+        return img.size
 
-def download_and_save_image(service, file_id: str, place_name: str) -> Optional[str]:
+def download_and_save_image(service, file_id: str, place_name: str) -> Optional[Dict]:
     """
-    Download image from Google Drive, resize it, and save it to the repository
-    Returns the path where the image was saved, or None if download fails
+    Download image from Google Drive, resize it, and save it and a thumbnail to the repository
+    Returns the image fields for places.json, or None if download fails
     """
     if not file_id or file_id.strip() == '':
         print(f"No image ID provided for {place_name}")
@@ -119,7 +131,19 @@ def download_and_save_image(service, file_id: str, place_name: str) -> Optional[
             resize_image(fh, cached_path)
 
         shutil.copyfile(cached_path, file_path)
-        return f"images/{filename}"
+        with Image.open(cached_path) as img:
+            width, height = img.size
+
+        # Made from the cached photo each run, since that's quick and needs no download
+        thumb_filename = filename.replace('.jpg', '-thumb.jpg')
+        resize_image(cached_path, images_dir / thumb_filename, THUMB_SIZE, quality=78)
+
+        return {
+            'imagePath': f"images/{filename}",
+            'thumbPath': f"images/{thumb_filename}",
+            'imageWidth': width,
+            'imageHeight': height,
+        }
 
     except Exception as e:
         print(f"Error downloading image for {place_name}: {str(e)}")
@@ -232,73 +256,81 @@ def geocode_address(address: str, cache: Dict) -> Optional[Tuple[float, float]]:
 
     return None
 
-def load_coordinates_cache() -> Dict:
+def load_cache(path: Path) -> Dict:
     """
-    Load the coordinates cache from file
+    Load a JSON cache from file
     """
-    cache_path = COORDINATES_CACHE_PATH
-    if cache_path.exists():
+    if path.exists():
         try:
-            with cache_path.open('r', encoding='utf-8') as f:
+            with path.open('r', encoding='utf-8') as f:
                 return json.load(f)
         except:
             pass
     return {}
 
-def save_coordinates_cache(cache: Dict):
+def save_cache(path: Path, cache: Dict):
     """
-    Save the coordinates cache to file
+    Save a JSON cache to file
     """
-    cache_path = COORDINATES_CACHE_PATH
-    cache_path.parent.mkdir(parents=True, exist_ok=True)
-    with cache_path.open('w', encoding='utf-8') as f:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open('w', encoding='utf-8') as f:
         json.dump(cache, f, indent=2, ensure_ascii=False)
 
-def process_geo_data(address: str) -> Tuple[Optional[str], Optional[str]]:
-    """Extract country and state from address string"""
-    print(f"\nProcessing address: {address}")
-    if not address:
-        print("No address provided")
-        return None, None
-    
+def parse_city(address: str) -> Optional[str]:
+    """
+    Read the city from a Google Maps address, e.g. 'Pittsburgh' from
+    '4709 Liberty Ave, Pittsburgh, PA 15224' or 'Stockholm' from 'Sturegatan 8, 114 35 Stockholm, Sweden'
+    """
     parts = [p.strip() for p in address.split(',')]
-    print(f"Address parts: {parts}")
-    
-    if len(parts) < 2:  # Need at least city, state
-        print("Not enough parts in address")
-        return None, None
-        
-    # Get the last part as country, if not specified assume USA
-    country = parts[-1].strip()
-    print(f"Last part: {country}")
-    
-    if country.lower() in ['usa', 'united states', 'us']:
-        country = 'USA'
-        print("Normalized country name to USA")
-    elif len(parts[-1].strip()) == 2:  # If last part is state code, assume USA
-        country = 'USA'
-        print("Found state code as last part, assuming USA")
-    
-    # Get state from second to last part if in USA
-    state = None
-    if country == 'USA' and len(parts) >= 2:
-        state_part = parts[-2].strip()
-        print(f"Checking state part: {state_part}")
-        # Check if it's a two-letter state code
-        if len(state_part) == 2:
-            state = state_part.upper()
-            print(f"Found two-letter state code: {state}")
-        else:
-            # Try to extract state code from longer state name (e.g., "Florida" -> "FL")
-            state_match = re.search(r'\b([A-Z]{2})\b', state_part.upper())
-            if state_match:
-                state = state_match.group(1)
-                print(f"Extracted state code from longer name: {state}")
-            else:
-                print(f"Could not extract state code from: {state_part}")
-    
-    print(f"Final result - Country: {country}, State: {state}")
-    return country, state
+    if len(parts) < 2:
+        return None
+
+    if re.fullmatch(r'[A-Z]{2} \d{5}(-\d{4})?', parts[-1]):
+        # US: "..., City, ST 12345"
+        city = parts[-2]
+    elif parts[0] == 'Japan':
+        # Japan, largest unit first: "Japan, 〒104-0061 Tokyo, Chuo City, ..."
+        city = re.sub(r'^〒[\d-]+\s*', '', parts[1])
+    elif match := re.fullmatch(r'[\d -]*\d\s+(\D+)', parts[-2]):
+        # Most of Europe: "..., 114 35 Stockholm, Sweden"
+        city = match.group(1)
+    else:
+        return None
+
+    return METRO_AREAS.get(city, city) or None
+
+def lookup_country(lat: float, lng: float, cache: Dict) -> Optional[str]:
+    """
+    Name the country at a point with Nominatim, for places whose address doesn't give a city
+    """
+    key = f"{lat:.3f},{lng:.3f}"
+    if key in cache:
+        return cache[key]
+
+    try:
+        time.sleep(1.2)
+        response = requests.get(
+            'https://nominatim.openstreetmap.org/reverse',
+            params={'lat': lat, 'lon': lng, 'format': 'json', 'zoom': 3, 'accept-language': 'en'},
+            headers={'User-Agent': 'IsasMatchaTierList/1.0'}
+        )
+        response.raise_for_status()
+        country = response.json().get('address', {}).get('country')
+    except Exception as e:
+        print(f"Country lookup error for {key}: {str(e)}")
+        return None
+
+    cache[key] = country
+    return country
+
+def parse_timestamp(value: str) -> Optional[str]:
+    """
+    Turn the form's Timestamp cell (e.g. '10/5/2026 14:03:22') into an ISO date
+    """
+    try:
+        return datetime.strptime(value, '%m/%d/%Y %H:%M:%S').date().isoformat()
+    except ValueError:
+        return None
 
 def report_skipped_rows(errors: List[str]):
     """
@@ -317,8 +349,9 @@ def fetch_and_process_data():
     """
     Fetch data from Google Sheets and process coordinates and images
     """
-    # Load the coordinates cache
-    coordinates_cache = load_coordinates_cache()
+    # Load the geocoding caches
+    coordinates_cache = load_cache(COORDINATES_CACHE_PATH)
+    countries_cache = load_cache(COUNTRIES_CACHE_PATH)
     
     # Set up Google Sheets and Drive authentication
     scopes = [
@@ -393,24 +426,24 @@ def fetch_and_process_data():
                 tier_rating += '+'
 
             # Extract file ID from the image URL/ID
-            image_path = None
+            image_fields = None
             image_url = get_field(record, 'Upload a picture!')
 
             if image_url:
                 file_id = extract_file_id(image_url)
                 if file_id:
                     if file_id not in processed_images:
-                        image_path = download_and_save_image(
+                        image_fields = download_and_save_image(
                             drive_service,
                             file_id,
                             place_name
                         )
-                        if image_path:
+                        if image_fields:
                             processed_images.add(file_id)
                 else:
                     print(f"Could not extract valid file ID from URL for {place_name}: {image_url}")
 
-            country, state = process_geo_data(address)
+            city = (parse_city(address) if address else None) or lookup_country(lat, lng, countries_cache)
 
             processed_place = {
                 'id': idx,
@@ -418,12 +451,13 @@ def fetch_and_process_data():
                 'tier': tier_rating,
                 'ordered': get_field(record, 'What did you order?'),
                 'notes': get_field(record, 'Notes'),
-                'imagePath': image_path,  # This will be None if no image or download failed
+                'imagePath': None,  # Stays None if no image or download failed
+                **(image_fields or {}),
                 'lat': lat,
                 'lng': lng,
+                'city': city,
+                'reviewed': parse_timestamp(get_field(record, 'Timestamp')),
                 'lastUpdated': datetime.now().isoformat(),
-                'country': country,
-                'state': state
             }
 
             # Add address if available
@@ -439,8 +473,9 @@ def fetch_and_process_data():
             print(error_msg)
             continue
 
-    # Save the updated coordinates cache
-    save_coordinates_cache(coordinates_cache)
+    # Save the updated geocoding caches
+    save_cache(COORDINATES_CACHE_PATH, coordinates_cache)
+    save_cache(COUNTRIES_CACHE_PATH, countries_cache)
 
     if errors:
         print("\nProcessing completed with errors:")
