@@ -1,5 +1,6 @@
 import { TIERS } from '../tiers';
 import MatchaCup from './MatchaCup';
+import { PenBox } from './PenMarks';
 import './TierBoard.css';
 
 // The tier list: one row per tier, best first. Each row's colored label holds the tier's
@@ -79,6 +80,7 @@ function PlaceTile({ place, href, selected, showCity, onOpen, onHover }) {
         ) : (
           <MatchaCup className="tile__no-photo" />
         )}
+        {selected && <PenBox className="tile__box" />}
         {place.plus && (
           <span className="tile__grade" title={`${place.grade}: top of the ${place.tier} tier`}>
             {place.grade}

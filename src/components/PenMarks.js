@@ -30,6 +30,18 @@ export const PenUnderline = ({ className = '' }) => (
   </svg>
 );
 
+// A quick box around a photo, the way a pick is marked on a contact sheet, closed by a stroke that
+// runs past where it began. Unlike the marks above, it keeps its stroke scaling with it: the box is
+// drawn bigger than its viewBox, and with non-scaling-stroke the draw-on would stop short
+export const PenBox = ({ className = '' }) => (
+  <svg className={`pen-mark ${className}`} viewBox="0 0 116 151" preserveAspectRatio="none" aria-hidden="true">
+    <path
+      pathLength="1"
+      d="M20 5.2C46 4.2 80 3 108.8 3Q114 3 113.8 8.2C114.6 52 113.2 104 112 143.6Q111.8 148.2 107.2 148.4C74 149.4 38 148.6 7.6 147Q2.6 146.8 2.8 141.6C2 98 2.4 50 3.6 9Q4 3.6 10 3.4C17 3.2 26 2 38 1.6"
+    />
+  </svg>
+);
+
 // Two quick strokes, for closing a note
 export const PenCross = ({ className = '' }) => (
   <svg className={`pen-mark ${className}`} viewBox="0 0 24 24" aria-hidden="true">

@@ -94,9 +94,18 @@
   transform: rotate(6deg);
 }
 
-.tile[aria-current] .tile__photo {
-  outline: 3px solid var(--pen);
-  outline-offset: 2px;
+/* The open review's photo is boxed in Isa's pen, under the plus grade's scrap */
+.tile__box {
+  position: absolute;
+  inset: -6px;
+  width: calc(100% + 12px);
+  height: calc(100% + 12px);
+  stroke-width: 2.4px;
+}
+
+/* A box is a longer stroke than an underline, so it takes a little longer to draw */
+.tile__box path {
+  animation-duration: 700ms;
 }
 
 .tile--placeholder .tile__photo {
